@@ -5,6 +5,7 @@
 
 #include "rom.h"
 #include "raw_inflate.h"
+#include "sool.h"
 
 #ifdef _WIN32
     #include <direct.h>
@@ -78,6 +79,14 @@ void burp_dump(rom_t *rom, uint32_t burpOffset, const char* outputDir)
         {
             raw_inflate(dst, block->dstSize, src, block->srcSize);
             fwrite(dst, 1, block->dstSize, fp);
+
+            if(memcmp(dst, "SOOL", 4) == 0)
+            {
+                //char outputPath[256];
+                sprintf(outputPath, "%s/%08X.sool.txt", burpDirPath, srcOffset);
+                sool_decode(dst, outputPath);
+                //printf("SOOL\n");
+            }
         }
         else
         {
