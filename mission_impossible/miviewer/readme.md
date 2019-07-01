@@ -6,7 +6,7 @@ The 5 sliders control the viewer itself. The first slider is to control the rota
 
 Allows exporting to extended .obj model format. It is recommended that you use MeshLab to view the model with vertex colors.
 
-Requires python3, pyqt 4, and pypng 0.019.
+Requires python3, pyqt 4, pyopengl 3.1.3, and pypng 0.019.
 
 ![alt text](https://i.imgur.com/J4TpinM.png)
 ![alt text](https://i.imgur.com/YHNGGr6.png)
