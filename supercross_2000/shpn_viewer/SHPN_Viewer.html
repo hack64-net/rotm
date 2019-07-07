@@ -1,0 +1,37 @@
+<html>
+<body>
+<h1>SHPN (.nsh) Texture Viewer v1.0</h1>
+<input type="file" id="input" accept=".nsh"/>
+<div id="output"></div>
+<script src="n64texture.js" type="text/javascript"></script>
+<script src="SHPN.js" type="text/javascript"></script>
+<script type="text/javascript">
+var shpn_file = null
+
+function resetOutput(){
+    const output = document.getElementById('output');
+    while (output.firstChild) {
+        output.firstChild.remove();
+    }
+    if(shpn_file != null){
+        output.appendChild(shpn_file.print_info());
+    }
+}
+
+function updateInfo(){
+    resetOutput()
+}
+
+document.querySelector('input').addEventListener('change', function() {
+  var reader = new FileReader();
+  reader.onload = function() {
+    var arrayBuffer = this.result, array = new Uint8Array(arrayBuffer);
+    shpn_file = new SHPN(array)
+    updateInfo()
+  }
+  reader.readAsArrayBuffer(this.files[0]);
+}, false);
+
+</script>
+</body>
+</html>
