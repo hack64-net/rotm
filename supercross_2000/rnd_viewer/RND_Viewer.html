@@ -1,0 +1,33 @@
+<html>
+<body>
+<h1>RND (.rnd) Model Viewer v1.0</h1>
+<input type="file" id="input" accept=".rnd"/>
+<div id="output"></div>
+<script src="three.min.js"></script>
+<script src="RND.js" type="text/javascript"></script>
+<script src="renderer.js" type="text/javascript"></script>
+<script type="text/javascript">
+var rnd_data = null
+var created_3d_window = false
+
+function updateInfo(){
+    if(!created_3d_window){
+        create_3d_window();
+        created_3d_window = true;
+    }
+    load_new_3d_object(rnd_data);
+}
+
+document.querySelector('input').addEventListener('change', function() {
+  var reader = new FileReader();
+  reader.onload = function() {
+    var arrayBuffer = this.result, array = new Uint8Array(arrayBuffer);
+    rnd_data = new RND(array)
+    updateInfo()
+  }
+  reader.readAsArrayBuffer(this.files[0]);
+}, false);
+
+</script>
+</body>
+</html>
