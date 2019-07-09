@@ -12,15 +12,21 @@ class RND_Point {
 }
 
 class RND_Vertex {
-    constructor(pointID) {
+    constructor(pointID, r, g, b) {
+        this.color = new THREE.Color(r / 255, g / 255, b / 255)
         this.pointID = pointID;
     }
 }
 
 class RND_Triangle {
-    constructor(v1, v2, v3, p1, p2, p3) {
-        this.vertexIDs = new THREE.Vector3(v1, v2, v3);
+    constructor(v1, v2, v3) {
+        var p1 = v1.pointID
+        var p2 = v2.pointID
+        var p3 = v3.pointID
         this.face3 = new THREE.Face3(p1, p2, p3);
+        this.face3.vertexColors[0] = v1.color
+        this.face3.vertexColors[1] = v2.color
+        this.face3.vertexColors[2] = v3.color
     }
 }
 
@@ -50,8 +56,11 @@ class RND {
         }
         
         for(var i = 0; i < num_verts; i++) {
+            var red = bytes[offset + 4];
+            var green = bytes[offset + 5];
+            var blue = bytes[offset + 6];
             var pointID = RND_Util.bytes_to_short_le(bytes, offset + 8);
-            this.vertices.push(new RND_Vertex(pointID));
+            this.vertices.push(new RND_Vertex(pointID, red, green, blue));
             offset += 10;
         }
         
@@ -59,10 +68,10 @@ class RND {
             var v1 = RND_Util.bytes_to_short_le(bytes, offset);
             var v2 = RND_Util.bytes_to_short_le(bytes, offset + 2);
             var v3 = RND_Util.bytes_to_short_le(bytes, offset + 4);
-            var p1 = this.vertices[v1].pointID
-            var p2 = this.vertices[v2].pointID
-            var p3 = this.vertices[v3].pointID
-            this.triangles.push(new RND_Triangle(v1, v2, v3, p1, p2, p3));
+            
+            this.triangles.push(
+                new RND_Triangle(this.vertices[v1], this.vertices[v2], this.vertices[v3])
+            );
             offset += 8;
         }
         
