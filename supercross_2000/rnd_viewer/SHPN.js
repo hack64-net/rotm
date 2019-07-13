@@ -167,6 +167,24 @@ class SHPN {
         return null;
     }
     
+    does_texture_have_transparency(name) {
+        var numTextures = this.textures.length;
+        for(var i = 0; i < numTextures; i++) {
+            if(this.textures[i].name == name) {
+                if(this.textures[i].data != undefined) {
+                    var tex_length = this.textures[i].data.length;
+                    for(var j = 0; j < tex_length; j+= 4) {
+                        if(this.textures[i].data[j + 3] < 255){
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            }
+        };
+        return null; // Return null if texture name is invalid.
+    }
+    
     print_info() {
         var output = document.createElement('div');
         var header = document.createElement('h1');

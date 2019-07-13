@@ -1,6 +1,6 @@
 var camera, scene, renderer;
 var geometry, material, mesh;
-var renderer_width = 500, renderer_height = 250;
+var renderer_width = 1000, renderer_height = 500;
 var zoom_value = 1.0;
 var slider_rotate_x, slider_rotate_y, slider_rotate_z;
 var slider_zoom;
@@ -13,7 +13,6 @@ function create_3d_window(){
 
 function load_new_3d_object(rnd){
     var num_materials = rnd.materials.length;
-    console.log(num_materials)
     
     var geometries = new Array(num_materials);
     var materials = new Array(num_materials);
@@ -26,7 +25,9 @@ function load_new_3d_object(rnd){
         if(rnd.SHPN != null && rnd.materials[i].tex != undefined){
             materials[i] = new THREE.MeshBasicMaterial({ 
                 vertexColors: THREE.VertexColors,
-                map: rnd.materials[i].tex
+                map: rnd.materials[i].tex,
+                transparent: rnd.materials[i].hasTransparency,
+                side: THREE.DoubleSide
             });
         } else {
             materials[i] = new THREE.MeshBasicMaterial({ 
@@ -35,6 +36,7 @@ function load_new_3d_object(rnd){
         }
     }
     
+    var triCount = 0
     rnd.triangles.forEach(function(e) {
         var matID = e.materialID;
         geometries[matID].faces.push(e.face3)
@@ -44,15 +46,6 @@ function load_new_3d_object(rnd){
             height = rnd.materials[matID].tex_height;
             if(width != 0 && height != 0) {
                 var Uvs = e.Uvs;
-                /*
-                Uvs[0].x *= (32.0 / rnd.materials[matID].tex_width)
-                Uvs[0].y *= (32.0 / rnd.materials[matID].tex_height)
-                Uvs[1].x *= (32.0 / rnd.materials[matID].tex_width)
-                Uvs[1].y *= (32.0 / rnd.materials[matID].tex_height)
-                Uvs[2].x *= (32.0 / rnd.materials[matID].tex_width)
-                Uvs[2].y *= (32.0 / rnd.materials[matID].tex_height)
-                */
-                //console.log(Uvs)
                 geometries[matID].faceVertexUvs[0].push(Uvs);
                 geometries[matID].uvsNeedUpdate = true;
             }
@@ -65,21 +58,12 @@ function load_new_3d_object(rnd){
         scene.remove(scene.children[0]); 
     }
     
-    console.log(geometries[0]);
-    console.log(materials[0]);
-    
-    // Test with only a single mesh for now
-    if(geometries[0].faces.length > 0){
-        mesh = new THREE.Mesh( geometries[0], materials[0] );
-        scene.add(mesh);
-    }
-    /*
     for(var i = 0; i < num_materials; i++){
         if(geometries[i].faces.length > 0){
             mesh = new THREE.Mesh( geometries[i], materials[i] );
             scene.add(mesh);
         }
-    }*/
+    }
     
     rnd_data = rnd
     
@@ -102,7 +86,7 @@ function update_camera_position() {
 }
 
 function init() {
-	camera = new THREE.PerspectiveCamera( 70, renderer_width / renderer_height, 0.01, 1000000 );
+	camera = new THREE.PerspectiveCamera( 70, renderer_width / renderer_height, 100, 1000000 );
     camera.position.x = 500;
     camera.position.y = 500;
     camera.position.z = 500;
@@ -174,11 +158,11 @@ function add_slider(container, id, min, max, step) {
 
 function init_controls() {
     var controls = document.createElement('div');
-    add_slider(controls, 'rotateSliderX', -3, 3, 1);
-    add_slider(controls, 'rotateSliderY', -3, 3, 1);
-    add_slider(controls, 'rotateSliderZ', -3, 3, 1);
+    add_slider(controls, 'rotateSliderX', -5, 5, 0.25);
+    add_slider(controls, 'rotateSliderY', -5, 5, 0.25);
+    add_slider(controls, 'rotateSliderZ', -5, 5, 0.25);
     controls.appendChild(document.createElement('br'));
-    add_slider(controls, 'zoomSlider', -3, 3, 0.25);
+    add_slider(controls, 'zoomSlider', -5, 5, 0.25);
     controls.appendChild(document.createElement('br'));
     add_button(controls, 'buttonReset', 'Reset Camera', reset);
     document.body.appendChild(controls);

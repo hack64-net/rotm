@@ -102,11 +102,11 @@ class RND {
             this.points.push(newPoint);
             offset += 6;
         }
-        console.log('offset = ' + offset.toString(16))
+        //console.log('offset = ' + offset.toString(16))
         
         for(var i = 0; i < num_verts; i++) {
-            var u = RND_Util.bytes_to_short_le(bytes, offset);
-            var v = RND_Util.bytes_to_short_le(bytes, offset + 2);
+            var u = RND_Util.bytes_to_short_le(bytes, offset) / 255;
+            var v = RND_Util.bytes_to_short_le(bytes, offset + 2) / 255;
             var red = bytes[offset + 4];
             var green = bytes[offset + 5];
             var blue = bytes[offset + 6];
@@ -114,7 +114,7 @@ class RND {
             this.vertices.push(new RND_Vertex(pointID, red, green, blue, u, v));
             offset += 10;
         }
-        console.log('offset = ' + offset.toString(16))
+        //console.log('offset = ' + offset.toString(16))
         
         for(var i = 0; i < num_triangles; i++) {
             var v1 = RND_Util.bytes_to_short_le(bytes, offset);
@@ -127,7 +127,7 @@ class RND {
             );
             offset += 8;
         }
-        console.log('offset = ' + offset.toString(16))
+        //console.log('offset = ' + offset.toString(16))
         
         //offset += 0x43 * num_materials;
         for(var i = 0; i < num_materials; i++) {
@@ -138,8 +138,8 @@ class RND {
             );
             offset += 0x43;
         }
+        /*
         console.log('offset = ' + offset.toString(16))
-        
         
         offset += 2 * num_unk;
         console.log('offset = ' + offset.toString(16))
@@ -150,13 +150,12 @@ class RND {
         offset += 0xE * num_unk3;
         console.log('offset = ' + offset.toString(16))
         
-        offset += 0x10 * num_unk5;
+        offset += 0x10 * (num_unk5 + 1);
         console.log('offset = ' + offset.toString(16))
         
         offset += 8 * num_unk6;
         console.log('offset = ' + offset.toString(16))
-        
-        
+        */
     }
     
     load_SHPN(nsh_bytes) {
@@ -173,15 +172,13 @@ class RND {
                     this.materials[i].tex_width = tex_size[0]
                     this.materials[i].tex_height = tex_size[1]
                     this.materials[i].tex = new THREE.DataTexture(tex_data, tex_size[0], tex_size[1], THREE.RGBAFormat);
-                    this.materials[i].tex.WrapS = THREE.RepeatWrapping;
-                    this.materials[i].tex.WrapT = THREE.RepeatWrapping;
-                    this.materials[i].tex.repeat.x = 32
-                    this.materials[i].tex.repeat.y = 32
+                    this.materials[i].hasTransparency = this.SHPN.does_texture_have_transparency(this.materials[i].texName);
                     this.materials[i].tex.needsUpdate = true;
                 } else {
                     console.log("Null material! Tex Name = " + this.materials[i].texName)
                     this.materials[i].tex_width = 0
                     this.materials[i].tex_height = 0
+                    this.materials[i].hasTransparency = false
                 }
             }
         }
