@@ -25,7 +25,8 @@ class RND_Util {
 
 class RND_Point {
     constructor(x, y, z) {
-        this.vec3 = new THREE.Vector3(x, y, z);
+        // Model is Z-up, so make it Y-up instead.
+        this.vec3 = new THREE.Vector3(x, z, -y);
     }
 }
 

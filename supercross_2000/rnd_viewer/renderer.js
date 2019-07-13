@@ -11,6 +11,44 @@ function create_3d_window(){
     animate();
 }
 
+// This is necessary for the exporters to work properly
+function convert_texture_to_png_texture(texture) {
+    var pixels = texture.image.data,
+    width = texture.image.width, 
+    height = texture.image.height,
+
+    canvas = document.createElement('canvas'),
+    context = canvas.getContext('2d'),
+    imgData = context.createImageData(width, height);
+
+    canvas.height = height;
+    canvas.width = width;
+    
+    // Copy texture data directly
+    for(var i = 0; i < pixels.length*4; i++) {
+        imgData.data[i] = pixels[i];
+    }
+
+    context.putImageData(imgData, 0, 0);
+
+    var img = new Image();
+    img.src = canvas.toDataURL('image/png');
+    var new_tex = new THREE.Texture(img);
+    
+    // These 3 lines need to be here to prevent the textures from 
+    // being automatically scaled down to a power of two.
+    new_tex.wrapS = THREE.ClampToEdgeWrapping;
+    new_tex.wrapT = THREE.ClampToEdgeWrapping;
+    new_tex.minFilter = THREE.LinearFilter;
+    
+    img.onload = function(){
+        new_tex.flipY = false;
+        new_tex.needsUpdate = true;
+    }
+    
+    return new_tex;
+}
+
 function load_new_3d_object(rnd){
     var num_materials = rnd.materials.length;
     
@@ -25,7 +63,7 @@ function load_new_3d_object(rnd){
         if(rnd.SHPN != null && rnd.materials[i].tex != undefined){
             materials[i] = new THREE.MeshBasicMaterial({ 
                 vertexColors: THREE.VertexColors,
-                map: rnd.materials[i].tex,
+                map: convert_texture_to_png_texture(rnd.materials[i].tex),
                 transparent: rnd.materials[i].hasTransparency,
                 side: THREE.DoubleSide
             });
@@ -86,12 +124,12 @@ function update_camera_position() {
 }
 
 function init() {
-	camera = new THREE.PerspectiveCamera( 70, renderer_width / renderer_height, 100, 1000000 );
+	camera = new THREE.PerspectiveCamera( 70, renderer_width / renderer_height, 1, 1000000 );
     camera.position.x = 500;
     camera.position.y = 500;
     camera.position.z = 500;
     camera.lookAt(0, 0, 0);
-    camera.up.set( 0, 0, 1 );
+    //camera.up.set( 0, 0, 1 );
 
 	scene = new THREE.Scene();
 
