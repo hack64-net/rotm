@@ -21,13 +21,12 @@ var elementsLoaded = false;
 var created_3d_window = false;
 
 function download_text_file(filename, filetype, text) {
-    var element = document.createElement('a');
-    element.setAttribute('href', 'data:text/'+filetype+';charset=utf-8,' + encodeURIComponent(text));
-    element.setAttribute('download', filename);
-    element.style.display = 'none';
-    document.body.appendChild(element);
-    element.click();
-    document.body.removeChild(element);
+    var uriContent = URL.createObjectURL(new Blob([text], {type : 'text/gltf'}));
+    var link = document.createElement('a');
+    link.setAttribute('href', uriContent);
+    link.setAttribute('download', filename);
+    var event = new MouseEvent('click');
+    link.dispatchEvent(event);
 }
 
 function add_elements(container){

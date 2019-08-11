@@ -229,7 +229,3 @@ function init_controls(container) {
     add_button(controls, 'buttonReset', 'Reset Camera', reset);
     container.appendChild(controls);
 }
-
-
-
-

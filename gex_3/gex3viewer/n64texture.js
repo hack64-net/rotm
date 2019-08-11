@@ -240,6 +240,3 @@ class N64TextureDecoder {
         return texData;
     }
 }
-
-
-
