@@ -97,9 +97,9 @@ class Gex3LevelViewer {
 
 class Gex3LevelViewerVertex {
     constructor(data, offset) {
-        var x = bytes_to_short(data, offset);
-        var y = bytes_to_short(data, offset + 2);
-        var z = bytes_to_short(data, offset + 4);
+        var x = bytes_to_short(data, offset) * 0.02;
+        var y = bytes_to_short(data, offset + 2) * 0.02;
+        var z = bytes_to_short(data, offset + 4) * 0.02;
         var u = bytes_to_short(data, offset + 8);
         var v = bytes_to_short(data, offset + 10);
         var r = data[offset + 0xC];

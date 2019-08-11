@@ -125,9 +125,9 @@ function update_camera_position() {
     //camera.position.x = rnd_data.max_point.vec3.x * 1.5 * zoom_value;
     //camera.position.y = rnd_data.max_point.vec3.y * 1.5 * zoom_value;
     //camera.position.z = rnd_data.max_point.vec3.z * 1.5 * zoom_value;
-    camera.position.x = -5500 * 1.5 * zoom_value;
-    camera.position.y = 5000 * 1.5 * zoom_value;
-    camera.position.z = 5500 * 1.5 * zoom_value;
+    camera.position.x = 200 * 1.5 * zoom_value;
+    camera.position.y = 200 * 1.5 * zoom_value;
+    camera.position.z = 200 * 1.5 * zoom_value;
     camera.lookAt(0, 0, 0);
 }
 
