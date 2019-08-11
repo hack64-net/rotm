@@ -1,0 +1,76 @@
+<html>
+<body>
+<h1>Gex 3 Level Viewer v0.1</h1>
+<span id="status">Load Gex 3 N64 ROM:</span>
+<input type="file" id="inputRND" accept=".z64,.n64,.v64"/>
+<div id="otherInputs">
+</span>
+<div id="output"></div>
+<!-- Libraries -->
+<script src="three.min.js" type="text/javascript"></script>
+<script src="pako.min.js" type="text/javascript"></script>
+<script src="GLTFExporter.js" type="text/javascript"></script>
+<!-- Code -->
+<script src="n64texture.js" type="text/javascript"></script>
+<script src="util.js" type="text/javascript"></script>
+<script src="gex3_rom.js" type="text/javascript"></script>
+<script src="gex3_level.js" type="text/javascript"></script>
+<script src="renderer.js" type="text/javascript"></script>
+<script type="text/javascript">
+var elementsLoaded = false;
+var created_3d_window = false;
+
+function download_text_file(filename, filetype, text) {
+    var element = document.createElement('a');
+    element.setAttribute('href', 'data:text/'+filetype+';charset=utf-8,' + encodeURIComponent(text));
+    element.setAttribute('download', filename);
+    element.style.display = 'none';
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+}
+
+function add_elements(container){
+    if(elementsLoaded){
+        return;
+    }
+    add_drop_down(container, 'levelPicker', LEVELS, function(e) {
+        levelViewer.select_level(e.target.value);
+        load_new_map();
+    });
+    add_button(container, 'downloadCollada', 'Download Model (.gltf)', function(){
+        if(confirm('You are about to download the model as a .gltf file. Is that OK?')) {
+            var filename = document.getElementById('levelPicker').value + '.gltf'
+            // Instantiate an exporter
+            var exporter = new THREE.GLTFExporter();
+            
+            exporter.parse( scene, function ( gltf ) {
+                console.log( gltf );
+                download_text_file(filename, 'gltf', JSON.stringify(gltf));
+            }, {} );
+        }
+    })
+    
+    elementsLoaded = true;
+}
+
+document.getElementById('inputRND').addEventListener('change', function() {
+    if(!created_3d_window){
+        create_3d_window();
+        created_3d_window = true;
+    }
+    var reader = new FileReader();
+    reader.onload = function() {
+        var arrayBuffer = this.result, array = new Uint8Array(arrayBuffer);
+        ROM = new Gex3ROM(array)
+        levelViewer = new Gex3LevelViewer(ROM);
+        add_elements(document.getElementById("otherInputs"));
+        levelViewer.select_level_from_index(0);
+        load_new_map();
+    }
+    reader.readAsArrayBuffer(this.files[0]);
+}, false);
+
+</script>
+</body>
+</html>
