@@ -110,6 +110,8 @@ class Gex3LevelViewerVertex {
         this.uv = new THREE.Vector2(u, v).divideScalar(2048.0);
         // Model is Z-Up, so make it Y-up instead.
         this.pos = new THREE.Vector3(x, z, -y);
+        this.pos.color = this.color;
+        this.pos.uv = this.uv;
     }
 }
 

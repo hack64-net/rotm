@@ -1,9 +1,6 @@
 var camera, scene, renderer;
 var geometry, material, mesh;
 var renderer_width = 800, renderer_height = 400;
-var zoom_value = 1.0;
-var slider_rotate_x, slider_rotate_y, slider_rotate_z;
-var slider_zoom;
 
 var ROM, levelViewer;
 
@@ -114,21 +111,21 @@ function load_new_map(){
 }
 
 function reset() {
-    zoom_value = 1.0;
-    scene.rotation.x = 0;
-    scene.rotation.y = 0;
-    scene.rotation.z = 0;
-    update_camera_position();
+    camAngleX = -0.78; 
+    camAngleY = -0.68;
+    xOff = 200.0;
+    yOff = 200.0;
+    zOff = 200.0;
+    xRotate = -0.7;
+    yRotate = -0.68;
+    zRotate = -0.71;
 }
 
 function update_camera_position() {
-    //camera.position.x = rnd_data.max_point.vec3.x * 1.5 * zoom_value;
-    //camera.position.y = rnd_data.max_point.vec3.y * 1.5 * zoom_value;
-    //camera.position.z = rnd_data.max_point.vec3.z * 1.5 * zoom_value;
-    camera.position.x = 200 * 1.5 * zoom_value;
-    camera.position.y = 200 * 1.5 * zoom_value;
-    camera.position.z = 200 * 1.5 * zoom_value;
-    camera.lookAt(0, 0, 0);
+    camera.position.x = xOff;
+    camera.position.y = yOff;
+    camera.position.z = zOff;
+    camera.lookAt(new THREE.Vector3(xOff+xRotate,yOff+yRotate,zOff+zRotate));
 }
 
 function init() {
@@ -149,32 +146,15 @@ function init() {
     renderer = new THREE.WebGLRenderer( { antialias: true } );
     renderer.setSize( renderer_width, renderer_height );
     renderer.setClearColor( 0x208FFF, 1 );
+    renderer.domElement.id = 'renderer';
     document.body.appendChild( renderer.domElement );
 
     init_controls(document.body);
 }
 
-function setup_sliders() {
-    slider_rotate_x = document.getElementById('rotateSliderX');
-    slider_rotate_y = document.getElementById('rotateSliderY');
-    slider_rotate_z = document.getElementById('rotateSliderZ');
-    slider_zoom = document.getElementById('zoomSlider');
-}
-
 function animate() {
 	requestAnimationFrame( animate );
-	//mesh.rotation.x += 0.001;
-    if(slider_rotate_x != null) {
-        scene.rotation.x += slider_rotate_x.value * 0.01;
-        scene.rotation.y += slider_rotate_y.value * 0.01;
-        scene.rotation.z += slider_rotate_z.value * 0.01;
-        if(slider_zoom.value != 0) {
-            zoom_value += slider_zoom.value * 0.005;
-            update_camera_position();
-        }
-    }
-    else
-        setup_sliders();
+    update_camera_position();
 	renderer.render( scene, camera );
 }
 
@@ -218,14 +198,20 @@ function add_drop_down(container, id, list, onchange){
     container.appendChild(select);
 }
 
+function add_notice_box(container, text) {
+    var box = document.createElement("span");
+    box.innerHTML = text;
+    box.style = 'width:' + renderer_width + 'px;background-color:#FFFBE6;border:black;border-style:solid;border-width:thin;padding:5px';
+    container.appendChild(box);
+}
+
 function init_controls(container) {
     var controls = document.createElement('div');
-    add_slider(controls, 'rotateSliderX', -5, 5, 0.25);
-    add_slider(controls, 'rotateSliderY', -5, 5, 0.25);
-    add_slider(controls, 'rotateSliderZ', -5, 5, 0.25);
-    add_break(controls);
-    add_slider(controls, 'zoomSlider', -5, 5, 0.25);
-    add_break(controls);
+    init_webgl_controls(document.getElementById('renderer'));
     add_button(controls, 'buttonReset', 'Reset Camera', reset);
+    add_break(controls);
+    add_break(controls);
+    add_notice_box(controls, "Controls: Hold down the left mouse button and move to rotate camera. Use mouse wheel to move forward/backward.");
     container.appendChild(controls);
+    reset();
 }
