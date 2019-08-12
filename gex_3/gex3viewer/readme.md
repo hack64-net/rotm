@@ -4,6 +4,5 @@ This is a simple javascript tool that lets you view and export level geometry fr
 
 ## TODO List:
 
-1. Finish the extended .obj exporter.
-2. Add level objects to the viewer.
-3. Find a way to speed up loading and reduce RAM usage.
+1. Add level objects to the viewer.
+2. Find a way to speed up loading times.

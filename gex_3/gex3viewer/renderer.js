@@ -57,7 +57,7 @@ function load_new_map(){
     
     for(var i = 0; i < num_materials; i++){
         geometries[i] = new THREE.Geometry();
-        levelViewer.vertices.forEach(function(vert) {
+        levelViewer.materials[i].vertices.forEach(function(vert) {
             geometries[i].vertices.push(vert.pos);
         });
         

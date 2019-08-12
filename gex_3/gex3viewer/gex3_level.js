@@ -72,12 +72,6 @@ class Gex3LevelViewer {
         var segment3StartOffset = address_to_map_offset(bytes_to_uint(this.MapData, mainHeaderOffset + 0x5C));
         var numberOfVertices = bytes_to_uint(this.MapData, mainHeaderOffset + 0x18);
         
-        // Load vertices
-        this.vertices = [];
-        for(var i = 0; i < numberOfVertices; i++) {
-            this.vertices.push(new Gex3LevelViewerVertex(this.MapData, segment1StartOffset + (i*0x10)));
-        }
-        
         // Load materials
         var textureListOffset = address_to_map_offset(bytes_to_uint(this.MapData, 0x2C));
         var numOfTextures = bytes_to_uint(this.MapData, textureListOffset);
@@ -89,14 +83,14 @@ class Gex3LevelViewer {
         
         nodesForTriangles.forEach(function(element) {
             this.geoGroups.push(
-                new Gex3LevelViewerGeoGroup(this.MapData, element.offset + 0x18, this.materials, this.vertices, segment2StartOffset, segment3StartOffset)
+                new Gex3LevelViewerGeoGroup(this.MapData, element.offset + 0x18, this.materials, segment1StartOffset, segment2StartOffset, segment3StartOffset)
             );
         }, this);
     }
 }
 
 class Gex3LevelViewerVertex {
-    constructor(data, offset) {
+    constructor(data, offset, material) {
         var x = bytes_to_short(data, offset) * 0.02;
         var y = bytes_to_short(data, offset + 2) * 0.02;
         var z = bytes_to_short(data, offset + 4) * 0.02;
@@ -108,21 +102,29 @@ class Gex3LevelViewerVertex {
         
         this.color = new THREE.Color(r / 255, g / 255, b / 255);
         this.uv = new THREE.Vector2(u, v).divideScalar(2048.0);
-        // Model is Z-Up, so make it Y-up instead.
-        this.pos = new THREE.Vector3(x, z, -y);
+        this.pos = new THREE.Vector3(x, z, -y); // Model is Z-Up, so make it Y-up instead.
         this.pos.color = this.color;
-        this.pos.uv = this.uv;
+        this.pos.uv = this.uv.multiply(material.uvScale);
     }
 }
 
 class Gex3LevelViewerGeoGroup {
-    constructor(data, start_offset, materials, vertices, segment2Start, segment3Start) {
-        //this.triangles = []; // List of triangle indices.
-        //this.textures = []; // Will contain either an integer (ID) or an Gex3LevelViewerMaterial.
-        this.__parse(data, start_offset, materials, vertices, segment2Start, segment3Start);
+    constructor(data, start_offset, materials, segment1Start, segment2Start, segment3Start) {
+        this.__parse(data, start_offset, materials, segment1Start, segment2Start, segment3Start);
     }
     
-    __parse(data, start_offset, materials, vertices, segment2Start, segment3Start) {
+    __check_if_material_has_vertex(data, material, vertexID, segment1Start) {
+        var foundIndex = material.indexIDs.indexOf(vertexID);
+        if(foundIndex == -1) {
+            foundIndex = material.indexIDs.length;
+            material.indexIDs.push(vertexID);
+            material.vertices.push(new Gex3LevelViewerVertex(data, segment1Start + (vertexID*0x10), material));
+        }
+        //console.log(material.indexIDs);
+        return foundIndex;
+    }
+    
+    __parse(data, start_offset, materials, segment1Start, segment2Start, segment3Start) {
         var offset = start_offset;
         var end = 100;
         var block = 0;
@@ -146,7 +148,7 @@ class Gex3LevelViewerGeoGroup {
             }
             
             var indiciesOffset = 0;
-            var triangles = [];
+            //var triangles = [];
             
             for(var i = 0; i < numCmds; i++) {
                 var cmd = data[offset];
@@ -162,47 +164,47 @@ class Gex3LevelViewerGeoGroup {
                         break;
                     case 0x05:
                         if(currentMaterial != null){
-                            var localIndex1 = (((w1 & 0xFF0000) >> 16) / 2) + indiciesOffset;
-                            var localIndex2 = (((w1 & 0xFF00) >> 8) / 2) + indiciesOffset;
-                            var localIndex3 = ((w1 & 0xFF) / 2) + indiciesOffset;
+                            var localIndex1 = this.__check_if_material_has_vertex(data, currentMaterial, (((w1 & 0xFF0000) >> 16) / 2) + indiciesOffset, segment1Start);
+                            var localIndex2 = this.__check_if_material_has_vertex(data, currentMaterial, (((w1 & 0xFF00) >> 8) / 2) + indiciesOffset, segment1Start);
+                            var localIndex3 = this.__check_if_material_has_vertex(data, currentMaterial, ((w1 & 0xFF) / 2) + indiciesOffset, segment1Start);
                             var face3 = new THREE.Face3(localIndex1, localIndex2, localIndex3);
-                            face3.vertexColors[0] = vertices[localIndex1].color;
-                            face3.vertexColors[1] = vertices[localIndex2].color;
-                            face3.vertexColors[2] = vertices[localIndex3].color;
+                            face3.vertexColors[0] = currentMaterial.vertices[localIndex1].color;
+                            face3.vertexColors[1] = currentMaterial.vertices[localIndex2].color;
+                            face3.vertexColors[2] = currentMaterial.vertices[localIndex3].color;
                             face3.uvs = [
-                                vertices[localIndex1].uv.clone().multiply(currentMaterial.uvScale), 
-                                vertices[localIndex2].uv.clone().multiply(currentMaterial.uvScale), 
-                                vertices[localIndex3].uv.clone().multiply(currentMaterial.uvScale)
+                                currentMaterial.vertices[localIndex1].uv, 
+                                currentMaterial.vertices[localIndex2].uv, 
+                                currentMaterial.vertices[localIndex3].uv
                             ];
                             currentMaterial.triangles.push(face3);
                         }
                         break;
                     case 0x06:
                         if(currentMaterial != null){
-                            var localIndex1 = (((w1 & 0xFF0000) >> 16) / 2) + indiciesOffset;
-                            var localIndex2 = (((w1 & 0xFF00) >> 8) / 2) + indiciesOffset;
-                            var localIndex3 = ((w1 & 0xFF) / 2) + indiciesOffset;
-                            var localIndex4 = (((w2 & 0xFF0000) >> 16) / 2) + indiciesOffset;
-                            var localIndex5 = (((w2 & 0xFF00) >> 8) / 2) + indiciesOffset;
-                            var localIndex6 = ((w2 & 0xFF) / 2) + indiciesOffset;
+                            var localIndex1 = this.__check_if_material_has_vertex(data, currentMaterial, (((w1 & 0xFF0000) >> 16) / 2) + indiciesOffset, segment1Start);
+                            var localIndex2 = this.__check_if_material_has_vertex(data, currentMaterial, (((w1 & 0xFF00) >> 8) / 2) + indiciesOffset, segment1Start);
+                            var localIndex3 = this.__check_if_material_has_vertex(data, currentMaterial, ((w1 & 0xFF) / 2) + indiciesOffset, segment1Start);
+                            var localIndex4 = this.__check_if_material_has_vertex(data, currentMaterial, (((w2 & 0xFF0000) >> 16) / 2) + indiciesOffset, segment1Start);
+                            var localIndex5 = this.__check_if_material_has_vertex(data, currentMaterial, (((w2 & 0xFF00) >> 8) / 2) + indiciesOffset, segment1Start);
+                            var localIndex6 = this.__check_if_material_has_vertex(data, currentMaterial, ((w2 & 0xFF) / 2) + indiciesOffset, segment1Start);
                             var face3 = new THREE.Face3(localIndex1, localIndex2, localIndex3);
-                            face3.vertexColors[0] = vertices[localIndex1].color;
-                            face3.vertexColors[1] = vertices[localIndex2].color;
-                            face3.vertexColors[2] = vertices[localIndex3].color;
+                            face3.vertexColors[0] = currentMaterial.vertices[localIndex1].color;
+                            face3.vertexColors[1] = currentMaterial.vertices[localIndex2].color;
+                            face3.vertexColors[2] = currentMaterial.vertices[localIndex3].color;
                             face3.uvs = [
-                                vertices[localIndex1].uv.clone().multiply(currentMaterial.uvScale), 
-                                vertices[localIndex2].uv.clone().multiply(currentMaterial.uvScale), 
-                                vertices[localIndex3].uv.clone().multiply(currentMaterial.uvScale)
+                                currentMaterial.vertices[localIndex1].uv, 
+                                currentMaterial.vertices[localIndex2].uv, 
+                                currentMaterial.vertices[localIndex3].uv
                             ];
                             currentMaterial.triangles.push(face3);
                             var face3_2 = new THREE.Face3(localIndex4, localIndex5, localIndex6);
-                            face3_2.vertexColors[0] = vertices[localIndex4].color;
-                            face3_2.vertexColors[1] = vertices[localIndex5].color;
-                            face3_2.vertexColors[2] = vertices[localIndex6].color;
+                            face3_2.vertexColors[0] = currentMaterial.vertices[localIndex4].color;
+                            face3_2.vertexColors[1] = currentMaterial.vertices[localIndex5].color;
+                            face3_2.vertexColors[2] = currentMaterial.vertices[localIndex6].color;
                             face3_2.uvs = [
-                                vertices[localIndex4].uv.clone().multiply(currentMaterial.uvScale), 
-                                vertices[localIndex5].uv.clone().multiply(currentMaterial.uvScale), 
-                                vertices[localIndex6].uv.clone().multiply(currentMaterial.uvScale)
+                                currentMaterial.vertices[localIndex4].uv, 
+                                currentMaterial.vertices[localIndex5].uv, 
+                                currentMaterial.vertices[localIndex6].uv
                             ];
                             currentMaterial.triangles.push(face3_2);
                         }
@@ -283,6 +285,8 @@ class Gex3LevelViewerTreeNode {
 
 class Gex3LevelViewerMaterial {
     constructor(data, addressOrOffset, segment3Start) {
+        this.indexIDs = [];
+        this.vertices = [];
         this.triangles = [];
         this.isAnimated = false;
         if((addressOrOffset & 0x80000000) != 0) { // Check if using RAM address.

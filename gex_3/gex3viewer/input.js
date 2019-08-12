@@ -13,7 +13,9 @@ var curWebglContainer;
 
 function init_webgl_controls(webglContainer) {
     webglContainer.addEventListener("wheel", function(e){
-        move_cam(e.deltaY * -5.0);
+        // Turns out that deltaY is different based on the browser. :|
+        // This should help even things out for all of them.
+        move_cam(20 * (e.deltaY > 0 ? -1 : 1));
     });
     webglContainer.addEventListener("mousedown", function(e){
         isDragging = true;
