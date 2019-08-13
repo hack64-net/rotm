@@ -76,6 +76,7 @@ class Gex3LevelViewer {
         var textureListOffset = address_to_map_offset(bytes_to_uint(this.MapData, 0x2C));
         var numOfTextures = bytes_to_uint(this.MapData, textureListOffset);
         this.materials = [];
+        this.specialMaterialMap = {}; // I don't really have a better name for this.
         for(var i = 0; i < numOfTextures; i++) {
             var address = bytes_to_uint(this.MapData, textureListOffset + 4 + (i*4));
             this.materials.push(new Gex3LevelViewerMaterial(this.MapData, address, segment3StartOffset));
@@ -83,7 +84,7 @@ class Gex3LevelViewer {
         
         nodesForTriangles.forEach(function(element) {
             this.geoGroups.push(
-                new Gex3LevelViewerGeoGroup(this.MapData, element.offset + 0x18, this.materials, segment1StartOffset, segment2StartOffset, segment3StartOffset)
+                new Gex3LevelViewerGeoGroup(this.MapData, element.offset + 0x18, this.materials, this.specialMaterialMap, segment1StartOffset, segment2StartOffset, segment3StartOffset)
             );
         }, this);
     }
@@ -109,8 +110,8 @@ class Gex3LevelViewerVertex {
 }
 
 class Gex3LevelViewerGeoGroup {
-    constructor(data, start_offset, materials, segment1Start, segment2Start, segment3Start) {
-        this.__parse(data, start_offset, materials, segment1Start, segment2Start, segment3Start);
+    constructor(data, start_offset, materials, specialMaterialMap, segment1Start, segment2Start, segment3Start) {
+        this.__parse(data, start_offset, materials, specialMaterialMap, segment1Start, segment2Start, segment3Start);
     }
     
     __check_if_material_has_vertex(data, material, vertexID, segment1Start) {
@@ -124,7 +125,7 @@ class Gex3LevelViewerGeoGroup {
         return foundIndex;
     }
     
-    __parse(data, start_offset, materials, segment1Start, segment2Start, segment3Start) {
+    __parse(data, start_offset, materials, specialMaterialMap, segment1Start, segment2Start, segment3Start) {
         var offset = start_offset;
         var end = 100;
         var block = 0;
@@ -143,12 +144,10 @@ class Gex3LevelViewerGeoGroup {
             offset += 8;
             if(type != 0x01 && type != 0x05) {
                 offset += 8;
-                //this.textures.push(headerTextureID);
-                currentMaterial = materials[headerTextureID];
             }
+            currentMaterial = materials[headerTextureID];
             
             var indiciesOffset = 0;
-            //var triangles = [];
             
             for(var i = 0; i < numCmds; i++) {
                 var cmd = data[offset];
@@ -211,8 +210,15 @@ class Gex3LevelViewerGeoGroup {
                         break;
                     case 0xDE:
                         if(type == 1) {
-                            //this.textures.push(new Gex3LevelViewerMaterial(data, segment2Start + (w2 & 0x00FFFFFF), segment3Start));
-                            currentMaterial = materials[0]; // Fix later!
+                            var specialTexOffset = segment2Start + (w2 & 0x00FFFFFF);
+                            var find = specialMaterialMap[specialTexOffset];
+                            if(find == undefined){
+                                specialMaterialMap[specialTexOffset] = materials.length;
+                                materials.push(new Gex3LevelViewerMaterial(data, segment2Start + (w2 & 0x00FFFFFF), segment3Start));
+                                currentMaterial = materials[materials.length - 1];
+                            } else {
+                                currentMaterial = materials[find];
+                            }
                         } else {
                             console.error('0xDE command used with type ' + type + ' at offset = 0x' + offset.toString(16));
                             return;
