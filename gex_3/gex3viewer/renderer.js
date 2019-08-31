@@ -2,54 +2,33 @@ var camera, scene, renderer;
 var geometry, material, mesh;
 var renderer_width = 800, renderer_height = 400;
 
-var ROM, levelViewer;
+var ROM, levelViewer, objects;
 
 function create_3d_window(){
     init();
     animate();
 }
 
-// This is necessary for the exporters to work properly
-function convert_texture_to_png_texture(texture) {
-    var pixels = texture.image.data,
-    width = texture.image.width, 
-    height = texture.image.height,
+function make_object_box(position){
+    var geometry = new THREE.BoxGeometry( 8, 8, 8 );
+    var material = new THREE.MeshBasicMaterial( {color: 0xFF0000, wireframe:true  } );
+    var box = new THREE.Mesh( geometry, material );
+    box.position.set(position.x, position.y, position.z);
+    return box;
+}
 
-    canvas = document.createElement('canvas'),
-    context = canvas.getContext('2d'),
-    imgData = context.createImageData(width, height);
-
-    canvas.height = height;
-    canvas.width = width;
-    
-    // Copy texture data directly
-    for(var i = 0; i < pixels.length*4; i++) {
-        imgData.data[i] = pixels[i];
+function init_objects() {
+    objects = [];
+    var offset = 0x818C0;
+    while (offset < 0x854F0){
+        var obj = new Gex3Object(ROM, offset);
+        objects[obj.name] = obj;
+        offset += 0x10;
     }
-
-    context.putImageData(imgData, 0, 0);
-
-    var img = new Image();
-    img.src = canvas.toDataURL('image/png');
-    var new_tex = new THREE.Texture(img);
-    
-    // These 3 lines need to be here to prevent the textures from 
-    // being automatically scaled down to a power of two.
-    //new_tex.wrapS = THREE.ClampToEdgeWrapping;
-    //new_tex.wrapT = THREE.ClampToEdgeWrapping;
-    new_tex.wrapS = THREE.RepeatWrapping;
-    new_tex.wrapT = THREE.RepeatWrapping;
-    new_tex.minFilter = THREE.LinearFilter;
-    
-    img.onload = function(){
-        new_tex.flipY = false;
-        new_tex.needsUpdate = true;
-    }
-    
-    return new_tex;
 }
 
 function load_new_map(){
+    // Load Map
     var num_materials = levelViewer.materials.length;
     
     var geometries = new Array(num_materials);
@@ -82,7 +61,6 @@ function load_new_map(){
             });
         }
         
-        
         if(levelViewer.materials[i].triangles != undefined) {
             //var texWidth = levelViewer.materials[i].width;
             //var texHeight = levelViewer.materials[i].height;
@@ -101,12 +79,35 @@ function load_new_map(){
         scene.remove(scene.children[0]); 
     }
     
+    
     for(var i = 0; i < num_materials; i++){
         if(geometries[i].faces.length > 0){
             var mesh = new THREE.Mesh( geometries[i], materials[i] );
             scene.add(mesh);
         }
     }
+    
+    /*
+    // The following is unfinished. Might return to this later, but I may also not.
+    
+    var objModels = [];
+    // Load object models
+    levelViewer.objectNameList.forEach(function(objName) {
+        objModels.push(objects[objName].get_mesh());
+    });
+    
+    levelViewer.levelObjects.forEach(function(obj) {
+        if(obj.id != -1) { // An object id of -1 means that it has no model.
+            var original_mesh = objModels[obj.id];
+            if(original_mesh != undefined){
+                scene.add(obj.make_clone(original_mesh));
+            } else {
+                console.error(levelViewer.objectNameList[obj.id] + ' with the id ' + obj.id + ' is undefined!');
+            }
+        }
+        scene.add(make_object_box(obj.pos));
+    });
+    */
     
     update_camera_position();
 }

@@ -62,7 +62,6 @@ class Gex3LevelViewer {
         var mainHeaderOffset = address_to_map_offset(bytes_to_uint(this.MapData, 0));
         
         this.tree = new Gex3LevelViewerTree(this.MapData, bytes_to_uint(this.MapData, mainHeaderOffset));
-        //console.log(this.tree.get_nodes_with_type(2));
         
         this.geoGroups = []
         var nodesForTriangles = this.tree.get_nodes_with_type(2);
@@ -72,7 +71,7 @@ class Gex3LevelViewer {
         var segment3StartOffset = address_to_map_offset(bytes_to_uint(this.MapData, mainHeaderOffset + 0x5C));
         var numberOfVertices = bytes_to_uint(this.MapData, mainHeaderOffset + 0x18);
         
-        // Load materials
+        /* Load materials */
         var textureListOffset = address_to_map_offset(bytes_to_uint(this.MapData, 0x2C));
         var numOfTextures = bytes_to_uint(this.MapData, textureListOffset);
         this.materials = [];
@@ -82,19 +81,56 @@ class Gex3LevelViewer {
             this.materials.push(new Gex3LevelViewerMaterial(this.MapData, address, segment3StartOffset));
         }
         
+        /* Load geometry */
         nodesForTriangles.forEach(function(element) {
             this.geoGroups.push(
                 new Gex3LevelViewerGeoGroup(this.MapData, element.offset + 0x18, this.materials, this.specialMaterialMap, segment1StartOffset, segment2StartOffset, segment3StartOffset)
             );
         }, this);
+        
+        /* Names of all the objects that should be loaded. */
+        this.objectNameList = [];
+        var objectNameListOffset = address_to_map_offset(bytes_to_uint(this.MapData, 0x44));
+        var numOfObjectNames = bytes_to_uint(this.MapData, objectNameListOffset);
+        for(var i = 0; i < numOfObjectNames; i++) {
+            var index = objectNameListOffset + 4 + (i * 8);
+            var name = binArrayToString(this.MapData.subarray(index, index + 8));
+            this.objectNameList.push(name);
+        }
+        
+        /* All the objects within the level. (Object ID to use, position, rotation, etc.) */
+        this.levelObjects = [];
+        var numOfLevelObjects = bytes_to_uint(this.MapData, 0x84);
+        var levelObjectsStartOffset = address_to_map_offset(bytes_to_uint(this.MapData, 0x88));
+        for(var i = 0; i < numOfLevelObjects; i++) {
+            var offset = levelObjectsStartOffset + (i * 0x34);
+            this.levelObjects.push(new Gex3LevelViewerObject(this.MapData, offset));
+        }
+    }
+}
+
+class Gex3LevelViewerObject {
+    constructor(data, offset) {
+        this.id = bytes_to_int(data, offset);
+        this.pos = new THREE.Vector3(
+            bytes_to_short(data, offset + 0x10),
+            bytes_to_short(data, offset + 0x14),
+            -bytes_to_short(data, offset + 0x12)
+        ).multiplyScalar(WORLD_SCALE);
+    }
+    
+    make_clone(original_mesh){
+        var new_mesh = original_mesh.clone();
+        new_mesh.position.set(this.pos.x, this.pos.y, this.pos.z);
+        return new_mesh;
     }
 }
 
 class Gex3LevelViewerVertex {
     constructor(data, offset, material) {
-        var x = bytes_to_short(data, offset) * 0.02;
-        var y = bytes_to_short(data, offset + 2) * 0.02;
-        var z = bytes_to_short(data, offset + 4) * 0.02;
+        var x = bytes_to_short(data, offset) * WORLD_SCALE;
+        var y = bytes_to_short(data, offset + 2) * WORLD_SCALE;
+        var z = bytes_to_short(data, offset + 4) * WORLD_SCALE;
         var u = bytes_to_short(data, offset + 8);
         var v = bytes_to_short(data, offset + 10);
         var r = data[offset + 0xC];
@@ -121,7 +157,6 @@ class Gex3LevelViewerGeoGroup {
             material.indexIDs.push(vertexID);
             material.vertices.push(new Gex3LevelViewerVertex(data, segment1Start + (vertexID*0x10), material));
         }
-        //console.log(material.indexIDs);
         return foundIndex;
     }
     

@@ -16,6 +16,7 @@
 <script src="n64texture.js" type="text/javascript"></script>
 <script src="util.js" type="text/javascript"></script>
 <script src="gex3_rom.js" type="text/javascript"></script>
+<script src="gex3_object.js" type="text/javascript"></script>
 <script src="gex3_level.js" type="text/javascript"></script>
 <script src="input.js" type="text/javascript"></script>
 <script src="renderer.js" type="text/javascript"></script>
@@ -112,6 +113,7 @@ document.getElementById('inputROM').addEventListener('change', function() {
     reader.onload = function() {
         var arrayBuffer = this.result, array = new Uint8Array(arrayBuffer);
         ROM = new Gex3ROM(array)
+        init_objects();
         levelViewer = new Gex3LevelViewer(ROM);
         add_elements(document.getElementById("otherInputs"));
         levelViewer.select_level_from_index(0);
