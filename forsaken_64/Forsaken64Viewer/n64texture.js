@@ -84,9 +84,28 @@ class N64TextureDecoder {
             texData[(i * 4) + 1] = ((pixel >> 6) & 0x1F) * 8     // Green
             texData[(i * 4) + 2] = ((pixel >> 1) & 0x1F) * 8     // Blue
             texData[(i * 4) + 3] = (pixel & 1) > 0 ? 0xFF : 0x00 // Transparency
+            //texData[(i * 4) + 3] = 0xFF;
         }
         return texData;
     }
+    
+    static decode_rgba16_no_transparency(bytes, width, height) {
+        if (bytes.length < width * height * 2){
+            console.error("RGBA16 decode error: byte array smaller than texture size");
+            return undefined;
+        }
+        var texData = new Array(width * height * 4)
+        var length = width * height
+        for (var i = 0; i < length; i++){
+            var pixel = (bytes[i * 2] << 8) | bytes[i * 2 + 1]
+            texData[(i * 4) + 0] = ((pixel >> 11) & 0x1F) * 8    // Red
+            texData[(i * 4) + 1] = ((pixel >> 6) & 0x1F) * 8     // Green
+            texData[(i * 4) + 2] = ((pixel >> 1) & 0x1F) * 8     // Blue
+            texData[(i * 4) + 3] = 0xFF;
+        }
+        return texData;
+    }
+    
     static decode_rgba32(bytes, width, height) {
         if (bytes.length < width * height * 4){
             print("RGBA32 decode error: byte array smaller than texture size")
@@ -94,6 +113,7 @@ class N64TextureDecoder {
         }
         return bytes;
     }
+    
     static decode_ci4(bytes, paletteColors, width, height) {
         if(bytes == null) {
             console.warn("ci4 error: bytes is null!");

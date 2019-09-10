@@ -1,5 +1,3 @@
-const WORLD_SCALE = 1;
-
 /* Convert value to unsigned 32 bit. */
 function u32(val) {
     return val >>> 0;
@@ -82,7 +80,7 @@ function set_status_text(text) {
 }
 
 // This is necessary for the exporters to work properly
-function convert_texture_to_png_texture(texture) {
+function convert_texture_to_png_texture(texture, doClamp) {
     var pixels = texture.image.data,
     width = texture.image.width, 
     height = texture.image.height,
@@ -105,12 +103,13 @@ function convert_texture_to_png_texture(texture) {
     img.src = canvas.toDataURL('image/png');
     var new_tex = new THREE.Texture(img);
     
-    // These 3 lines need to be here to prevent the textures from 
-    // being automatically scaled down to a power of two.
-    //new_tex.wrapS = THREE.ClampToEdgeWrapping;
-    //new_tex.wrapT = THREE.ClampToEdgeWrapping;
-    new_tex.wrapS = THREE.RepeatWrapping;
-    new_tex.wrapT = THREE.RepeatWrapping;
+    if(doClamp){
+        new_tex.wrapS = THREE.ClampToEdgeWrapping;
+        new_tex.wrapT = THREE.ClampToEdgeWrapping;
+    } else {
+        new_tex.wrapS = THREE.RepeatWrapping;
+        new_tex.wrapT = THREE.RepeatWrapping;
+    }
     new_tex.minFilter = THREE.LinearFilter;
     
     img.onload = function(){

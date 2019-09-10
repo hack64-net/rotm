@@ -10,9 +10,17 @@ function create_3d_window(){
 }
 
 function load_model(offset){
-    var rnx = new RNX(rom, offset);
-    var rnx_data = rnx.get_data();
-    var model = new ForsakenModel(rnx_data);
+    var model;
+    var isLevel = (typeof offset === 'object');
+    
+    if(isLevel) {
+        var geo_rnx = new RNX(rom, offset.geometry);
+        var tex_rnx = new RNX(rom, offset.textures);
+        model = new ForsakenLevel(geo_rnx.get_data(), tex_rnx.get_data());
+    } else {
+        var rnx = new RNX(rom, offset);
+        model = new ForsakenModel(rnx.get_data());
+    }
     
     var num_materials = model.materials.length;
     
@@ -27,16 +35,23 @@ function load_model(offset){
         });
         
         if(model.materials[i].tex != undefined) {
-            materials[i] = new THREE.MeshLambertMaterial({ 
-                vertexColors: THREE.VertexColors,
-                map: convert_texture_to_png_texture(model.materials[i].tex),
-                transparent: model.materials[i].hasTransparency,
-                //side: THREE.DoubleSide
-            });
+            if(isLevel) {
+                materials[i] = new THREE.MeshBasicMaterial({ 
+                    vertexColors: THREE.VertexColors,
+                    map: convert_texture_to_png_texture(model.materials[i].tex, true),
+                    transparent: model.materials[i].hasTransparency,
+                    //side: THREE.DoubleSide
+                });
+            } else {
+                materials[i] = new THREE.MeshLambertMaterial({ 
+                    vertexColors: THREE.VertexColors,
+                    map: convert_texture_to_png_texture(model.materials[i].tex, false),
+                    transparent: model.materials[i].hasTransparency,
+                });
+            }
         } else {
-            materials[i] = new THREE.MeshLambertMaterial({ 
+            materials[i] = new THREE.MeshBasicMaterial({ 
                 vertexColors: THREE.VertexColors,
-                //side: THREE.DoubleSide
             });
         }
         
@@ -55,8 +70,8 @@ function load_model(offset){
         scene.remove(scene.children[0]); 
     }
     
-    var light = new THREE.PointLight( 0xFFFFFF, 1, 100000 );
-    light.position.set( 100, 100, 100 );
+    var light = new THREE.PointLight( 0xFFFFFF, 1, 1000000 );
+    light.position.set( 1000, 1000, 1000 );
     scene.add( light );
     
     for(var i = 0; i < num_materials; i++){
@@ -146,13 +161,19 @@ function add_break(container) {
     container.appendChild(document.createElement('br'));
 }
 
-function add_drop_down(container, id, list, onchange){
+function add_drop_down(container, id, levelList, objectList, onchange){
     var select = document.createElement("select");
     select.id = id;
-    for(var i = 0; i < list.length; i++) {
+    for(var i = 0; i < levelList.length; i++) {
         var option = document.createElement("option");
-        option.value = list[i];
-        option.innerHTML = "0x" + list[i].toString(16);
+        option.value = 'Level:'+i;
+        option.innerHTML = "Level: 0x" + levelList[i].geometry.toString(16);
+        select.appendChild(option);
+    }
+    for(var i = 0; i < objectList.length; i++) {
+        var option = document.createElement("option");
+        option.value = 'Object:'+i;
+        option.innerHTML = "Object: 0x" + objectList[i].toString(16);
         select.appendChild(option);
     }
     select.onchange = onchange;

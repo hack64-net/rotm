@@ -1,3 +1,5 @@
+const OBJECT_SCALE = 1;
+
 F3DEX_CMDS = {
     'VTX'         : 0x04,
     'TRI2'        : 0xB1,
@@ -169,9 +171,9 @@ class ForsakenModel_Material {
 
 class ForsakenModel_Vertex {
     constructor(data, offset, material) {
-        var x = bytes_to_short(data, offset) * WORLD_SCALE;
-        var y = bytes_to_short(data, offset + 2) * WORLD_SCALE;
-        var z = bytes_to_short(data, offset + 4) * WORLD_SCALE;
+        var x = bytes_to_short(data, offset) * OBJECT_SCALE;
+        var y = bytes_to_short(data, offset + 2) * OBJECT_SCALE;
+        var z = bytes_to_short(data, offset + 4) * OBJECT_SCALE;
         var u = bytes_to_short(data, offset + 8);
         var v = bytes_to_short(data, offset + 10);
         var nx = data[offset + 0xC];
