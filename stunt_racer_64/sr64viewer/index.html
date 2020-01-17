@@ -1,0 +1,405 @@
+<html>
+<head>
+<meta charset="utf-8">
+<title>SR64 Viewer</title>
+<script src="three.min.js"></script>
+<script src="pako.min.js"></script>
+<body style="background: #111; color: #FFF;">
+
+<div style="text-align: center;">
+    <div>
+        <div style="padding-bottom: 10px; text-align: left;"><input type="file" id="file"></div>
+        <div style="display: inline-block; margin: auto auto; text-align: left;">
+            <div id="container"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+
+const NUM_SR64_LEVELS = 13;
+
+function Viewer(queryDomContainer)
+{
+    var _this = this;
+    this.scene = new THREE.Scene();
+    this.renderer = new THREE.WebGLRenderer();
+
+    this.keysDown = {};
+
+    this.camSpeedZ = 0;
+    this.camSpeedX = 0;
+    this.camSpeedY = 0;
+
+    this.camRotSpeedX = 0;
+    this.camRotSpeedY = 0;
+
+    this.width = 960;
+    this.height = 720;
+
+    this.renderer.setPixelRatio(window.devicePixelRatio);
+    this.renderer.setSize(this.width, this.height);
+    this.renderer.setScissorTest(true);
+    this.renderer.alpha = true;
+    this.renderer.setClearColor(0, 1.0);
+    this.renderer.setViewport(0, 0, this.width, this.height);
+    this.renderer.setScissor(0, 0, this.width, this.height);
+
+    this.renderer.domElement.tabIndex = '0'
+    this.renderer.domElement.viewer = this;
+
+    var domContainer = document.querySelector(queryDomContainer);
+    var domSelectDiv = document.createElement('div');
+    this.domSelect = document.createElement('select');
+
+    this.domSelect.setAttribute('disabled', '')
+
+    this.domSelect.addEventListener('change', function(e)
+    {
+        var levelIndex = this.value || 0;
+        _this.loadMap(levelIndex);
+    })
+
+    for(var i = 0; i < NUM_SR64_LEVELS; i++)
+    {
+        var domOption = document.createElement('option');
+        domOption.innerHTML = "Level 0" + i.toString(16).toUpperCase();
+        domOption.setAttribute('value', i);
+        this.domSelect.appendChild(domOption);
+    }
+
+    domSelectDiv.appendChild(this.domSelect);
+    domContainer.appendChild(domSelectDiv);
+    domContainer.appendChild(this.renderer.domElement);
+
+    this.camera = new THREE.PerspectiveCamera(60, this.width/this.height, 1, 30000);
+    this.camera.rotation.order = "YXZ";
+
+    this.renderer.domElement.onkeydown = function(e)
+    {
+        this.viewer.keysDown[e.keyCode] = true;
+    	e.preventDefault();
+    	return false;
+    }
+
+    this.renderer.domElement.onkeyup = function(e)
+    {
+    	delete this.viewer.keysDown[e.keyCode];
+    	e.preventDefault();
+    	return false;
+    }
+
+    this.renderer.domElement.oncontextmenu = function(e)
+    {
+        e.preventDefault();
+        return false;
+    }
+
+    this.renderer.domElement.onmousedown = function(e)
+    {
+        this.requestPointerLock();
+        this.focus();
+        e.preventDefault();
+        return false;
+    }
+
+    var lastMovementX = 0;
+    var lastMovementY = 0;
+
+    this.renderer.domElement.onmousemove = function(e)
+    {
+        if(e.buttons == 0)
+        {
+            return;
+        }
+
+        var movementX = (lastMovementX*4 + e.movementX) / 5;
+        var movementY = (lastMovementY*4 + e.movementY) / 5;
+        lastMovementX = movementX;
+        lastMovementY = movementY;
+
+        if(e.buttons == 1)
+        {
+            viewer.camera.translateX(-movementX * 5);
+            viewer.camera.translateY(movementY * 5);
+        }
+
+        if(e.buttons == 4)
+        {
+            viewer.camera.translateZ(-movementX * 5);
+            viewer.camera.translateZ(movementY * 5);
+        }
+
+        if(e.buttons == 2)
+        {
+            //viewer.camRotSpeedX = -e.movementX * 20;
+            viewer.camera.rotateY(-movementX * 0.01);
+            viewer.camera.rotateX(-movementY * 0.01);
+            viewer.camera.rotation.z = 0;
+        }
+    }
+
+    this.renderer.domElement.onmouseup = function(e)
+    {
+        lastMovementX = 0;
+        lastMovementY = 0;
+        document.exitPointerLock();
+    }
+
+    this.keyEvents = {
+	    //27: function(){ _this.resetCamera() }, // esc - reset camera position
+	    87: function(viewer){ viewer.camSpeedZ = -30; }, // w - move forward
+	    65: function(viewer){ viewer.camSpeedX = -30; }, // a - pan left
+	    83: function(viewer){ viewer.camSpeedZ = 30; }, // s - move backward
+	    68: function(viewer){ viewer.camSpeedX = 30; }, // d - pan right
+	    90: function(viewer){ viewer.camSpeedY = -30; }, // z - move down
+	    88: function(viewer){ viewer.camSpeedY = 30; }, // x - move up
+	    40: function(viewer){ viewer.camRotSpeedX = -20; }, // down - rotate down
+	    38: function(viewer){ viewer.camRotSpeedX =  20; }, // up - rotate up
+	    37: function(viewer){ viewer.camRotSpeedY =  20;;}, // left - rotate left
+	    39: function(viewer){ viewer.camRotSpeedY = -20;}  // right - rotate right
+    }
+}
+
+Viewer.prototype.animate = function()
+{
+    viewer.camera.translateZ(this.camSpeedZ);
+    viewer.camera.translateX(this.camSpeedX);
+    viewer.camera.translateY(this.camSpeedY);
+
+    viewer.camera.rotateX(this.camRotSpeedX / 1000);
+    viewer.camera.rotateY(this.camRotSpeedY / 1000);
+    viewer.camera.rotation.z = 0;
+
+    if(this.camSpeedZ < 0) this.camSpeedZ += 0.25*3;
+    if(this.camSpeedZ > 0) this.camSpeedZ -= 0.25*3;
+    if(this.camSpeedX > 0) this.camSpeedX -= 0.25*3;
+    if(this.camSpeedX < 0) this.camSpeedX += 0.25*3;
+    if(this.camSpeedY > 0) this.camSpeedY -= 0.25*3;
+    if(this.camSpeedY < 0) this.camSpeedY += 0.25*3;
+    if(this.camRotSpeedX > 0) this.camRotSpeedX -= 1;
+    if(this.camRotSpeedX < 0) this.camRotSpeedX += 1;
+    if(this.camRotSpeedY > 0) this.camRotSpeedY -= 1;
+    if(this.camRotSpeedY < 0) this.camRotSpeedY += 1;
+
+    for(var k in this.keysDown)
+    {
+        if(k in this.keyEvents) this.keyEvents[k](this);
+    }
+
+    this.renderer.render(this.scene, this.camera)
+    requestAnimationFrame(this.animate.bind(this));
+}
+
+Viewer.prototype.extractArchive = function(romOffset)
+{
+    var header = new ArchiveHeader(this.dv, romOffset);
+    romOffset += ArchiveHeader.SIZE;
+
+    var archiveDst = new Uint8Array(header.dstSize);
+    var numBytesWritten = 0;
+
+    while(numBytesWritten < header.dstSize)
+    {
+        var blockSrcSize = this.dv.getUint32(romOffset + 0x00);
+        romOffset += 4;
+
+        var blockSrc = this.ab.slice(romOffset, romOffset + blockSrcSize);
+        var blockDst = pako.inflate(blockSrc);
+
+        for(var i = 0; i < blockDst.byteLength; i++)
+        {
+            archiveDst[numBytesWritten + i] = blockDst[i];
+        }
+
+        romOffset += (blockSrcSize + 1) & 0xFFFFFFFE;
+        numBytesWritten += blockDst.byteLength;
+    }
+
+    return archiveDst;
+}
+
+Viewer.prototype.loadMap = function(index)
+{
+    while(this.scene.children.length > 0)
+    { 
+        this.scene.remove(this.scene.children[0]); 
+    }
+
+    var raArchiveEntry = 0x000BBDA0 + index * 0x5C;
+    var raArchive = this.dv.getUint32(raArchiveEntry + 0x14);
+    //var raUnk = dv.getUint32(raArchiveEntry + 0x18);
+
+    var archiveSrcSize = this.dv.getUint32(raArchive + 0x00);
+    var raOtherArchives = raArchive + archiveSrcSize; // probably not the right way to obtain this
+
+    var archiveDst = this.extractArchive(raArchive);
+    var mapdv = new DataView(archiveDst.buffer);
+
+    var offsEnd = mapdv.getUint32(0x00);
+    var numModels = mapdv.getUint32(0x60);
+    var offsFileGroups = mapdv.getUint32(0x64);
+    var numFileGroups = mapdv.getUint32(0x68);
+    var offsModelTable = mapdv.getUint32(0x6C);
+
+    for(var i = 0; i < numFileGroups; i++)
+    {
+        var offsFileGroupHdr = mapdv.getUint32(offsFileGroups + i * 4);
+        var numFiles = mapdv.getUint32(offsFileGroupHdr + 0x00);
+        var offsFileIndices = mapdv.getUint32(offsFileGroupHdr + 0x04);
+
+        for(var j = 0; j < numFiles; j++)
+        {
+            var fileIndex = mapdv.getUint16(offsFileIndices + j * 2);
+            
+            var offsEntry = offsModelTable + fileIndex * 12;
+            var offsModelStart = mapdv.getUint32(offsEntry + 0x00);
+            var offsModelEnd = mapdv.getUint32(offsEntry + 0x04);
+            var offsModelMeta = mapdv.getUint32(offsEntry + 0x08);
+            var modelRomAddr = (raOtherArchives + offsModelStart);
+            var modelRomAddrEnd = (raOtherArchives + offsModelEnd);
+
+            var modeldv = new DataView(this.extractArchive(modelRomAddr).buffer);
+            this.loadModel(modeldv, offsModelMeta)
+        }
+    }
+}
+
+Viewer.prototype.loadRom = function(ab)
+{
+    this.ab = ab;
+    this.dv = new DataView(ab);
+    this.loadMap(0);
+    this.domSelect.removeAttribute('disabled');
+}
+
+function ArchiveHeader(dv, offset)
+{
+    this.srcSize = dv.getUint32(offset + 0x00);
+    this.dstSize = dv.getUint32(offset + 0x04);
+}
+
+ArchiveHeader.SIZE = 8;
+
+function ModelMeta(dv, offset)
+{
+    this.unk00        = dv.getUint32(offset + 0x00);
+    this.unk04        = dv.getUint32(offset + 0x04);
+    this.offsGeomMeta = dv.getUint32(offset + 0x08);
+    this.modelX       = (dv.getInt32(offset + 0x0C) / 2048);
+    this.modelY       = (dv.getInt32(offset + 0x10) / 2048);
+    this.modelZ       = (dv.getInt32(offset + 0x14) / 2048);
+    this.unk18        = dv.getUint32(offset + 0x18);
+    this.unk1C        = dv.getUint32(offset + 0x1C);
+    this.unk20        = dv.getUint32(offset + 0x20);
+    this.unk24        = dv.getUint32(offset + 0x24);
+}
+
+function GeometryMeta(dv, offset)
+{
+    this.offsVertices = dv.getUint32(offset + 0x00);
+    this.numVertices  = dv.getUint32(offset + 0x04);
+    this.offsFaces    = dv.getUint32(offset + 0x08);
+    this.numFaces     = dv.getUint32(offset + 0x0C);
+}
+
+function ModelVertex(dv, offset)
+{
+    this.x = dv.getInt16(offset + 0x00);
+    this.y = dv.getInt16(offset + 0x02);
+    this.z = dv.getInt16(offset + 0x04);
+}
+
+ModelVertex.SIZE = 0x06;
+
+function ModelFace(dv, offset)
+{
+    this.unk00 = dv.getUint16(offset + 0x00);
+    this.unk02 = dv.getUint16(offset + 0x02);
+    this.unk04 = dv.getUint8(offset + 0x04); // texture ID
+    this.unk05 = dv.getUint8(offset + 0x05);
+    this.unk06 = dv.getUint16(offset + 0x06);
+    this.vidx0 = dv.getInt16(offset + 0x08);
+    this.vidx1 = dv.getInt16(offset + 0x0A);
+    this.vidx2 = dv.getInt16(offset + 0x0C);
+    this.vidx3 = dv.getInt16(offset + 0x0E);
+    this.unk10 = dv.getInt16(offset + 0x10);
+    this.unk12 = dv.getInt16(offset + 0x12);
+    this.unk14 = dv.getInt16(offset + 0x14);
+    this.unk16 = dv.getInt16(offset + 0x16);
+}
+
+ModelFace.SIZE = 0x20;
+
+function randColor24(minGamma)
+{
+    var t = 255 - minGamma;
+    var r = (minGamma + Math.random() * t) & 0xFF;
+    var g = (minGamma + Math.random() * t) & 0xFF;
+    var b = (minGamma + Math.random() * t) & 0xFF;
+    return (r << 16 | g << 8 | b);
+}
+
+Viewer.prototype.loadModel = function(modeldv, offsModelHeader)
+{
+    var geom = new THREE.Geometry();
+    
+    var modelMeta = new ModelMeta(modeldv, offsModelHeader);
+    var geomMeta = new GeometryMeta(modeldv, modelMeta.offsGeomMeta);
+
+    for(var i = 0; i < geomMeta.numVertices; i++)
+    {
+        var offsVertex = geomMeta.offsVertices + (i * ModelVertex.SIZE);
+        var vertex = new ModelVertex(modeldv, offsVertex);
+        var vec3 = new THREE.Vector3(
+            (vertex.x + modelMeta.modelX) * -1.0,
+            (vertex.z + modelMeta.modelZ),
+            (vertex.y + modelMeta.modelY)
+        );
+        geom.vertices.push(vec3);
+    }
+
+    for(var i = 0; i < geomMeta.numFaces; i++)
+    {
+        var offsFace = geomMeta.offsFaces + (i * ModelFace.SIZE);
+        var face = new ModelFace(modeldv, offsFace);
+        geom.faces.push(new THREE.Face3(face.vidx0, face.vidx1, face.vidx2));
+        if(face.vidx3 != -1)
+        {
+            geom.faces.push(new THREE.Face3(face.vidx0, face.vidx2, face.vidx3));
+        }
+    }
+
+    var mat = new THREE.MeshBasicMaterial({ color: randColor24(50), wireframe: true });
+    var obj = new THREE.Mesh(geom, mat);
+    this.scene.add(obj);
+
+}
+
+//////////////////////////////////////////////////
+
+function attachFileReader(query, onloadend)
+{
+    var domFileInput = document.querySelector(query);
+    var reader = new FileReader();
+    reader.onloadend = function()
+    {
+        onloadend(reader.result);
+    }
+
+    domFileInput.addEventListener('change', function()
+    {
+        reader.readAsArrayBuffer(domFileInput.files[0]);
+    });
+}
+
+attachFileReader('#file', function(ab)
+{
+    viewer.loadRom(ab);
+})
+
+
+var viewer = new Viewer('#container');
+viewer.animate();
+
+</script>
