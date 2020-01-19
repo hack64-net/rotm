@@ -2,6 +2,7 @@
 <head>
 <meta charset="utf-8">
 <title>SR64 Viewer</title>
+</head>
 <script src="three.min.js"></script>
 <script src="pako.min.js"></script>
 <body style="background: #111; color: #FFF;">
@@ -24,6 +25,9 @@ function Viewer(queryDomContainer)
     var _this = this;
     this.scene = new THREE.Scene();
     this.renderer = new THREE.WebGLRenderer();
+
+    this.mapdv = null;
+    this.raOtherArchives = 0;
 
     this.keysDown = {};
 
@@ -72,7 +76,7 @@ function Viewer(queryDomContainer)
     domContainer.appendChild(domSelectDiv);
     domContainer.appendChild(this.renderer.domElement);
 
-    this.camera = new THREE.PerspectiveCamera(60, this.width/this.height, 1, 30000);
+    this.camera = new THREE.PerspectiveCamera(60, this.width/this.height, 1, 100000);
     this.camera.rotation.order = "YXZ";
 
     this.renderer.domElement.onkeydown = function(e)
@@ -219,6 +223,49 @@ Viewer.prototype.extractArchive = function(romOffset)
     return archiveDst;
 }
 
+Viewer.prototype.loadArchiveGroup = function(numFiles, offsFileGroups, numFileGroups, offsFileTable, bVerbose)
+{
+    var files = [];
+    var groups = [];
+
+    for(var i = 0; i < numFiles; i++)
+    {
+        var offsEntry         = (offsFileTable + i * 12);
+        var offsArchiveStart  = this.mapdv.getUint32(offsEntry + 0x00);
+        var offsArchiveEnd    = this.mapdv.getUint32(offsEntry + 0x04);
+        var offsMeta          = this.mapdv.getUint32(offsEntry + 0x08);
+        var archiveRomAddr    = (this.raOtherArchives + offsArchiveStart);
+        var archiveRomAddrEnd = (this.raOtherArchives + offsArchiveEnd);
+        
+        if(bVerbose)
+        {
+            console.log("extracted archive from " + (archiveRomAddr + 0x0C).toString(16));
+        }
+
+        var filedv = new DataView(this.extractArchive(archiveRomAddr).buffer);
+        files.push({ dv: filedv, offsMeta: offsMeta });
+    }
+
+    for(var i = 0; i < numFileGroups; i++)
+    {
+        var fileIndices = [];
+
+        var offsFileGroupHdr = this.mapdv.getUint32(offsFileGroups + i * 4);
+        var numFileIndices   = this.mapdv.getUint32(offsFileGroupHdr + 0x00);
+        var offsFileIndices  = this.mapdv.getUint32(offsFileGroupHdr + 0x04);
+
+        for(var j = 0; j < numFileIndices; j++)
+        {
+            var fileIndex = this.mapdv.getUint16(offsFileIndices + j * 2);
+            fileIndices.push(fileIndex);
+        }
+
+        groups.push(fileIndices);
+    }
+
+    return { files: files, groups: groups };
+}
+
 Viewer.prototype.loadMap = function(index)
 {
     while(this.scene.children.length > 0)
@@ -231,38 +278,398 @@ Viewer.prototype.loadMap = function(index)
     //var raUnk = dv.getUint32(raArchiveEntry + 0x18);
 
     var archiveSrcSize = this.dv.getUint32(raArchive + 0x00);
+
     var raOtherArchives = raArchive + archiveSrcSize; // probably not the right way to obtain this
+    this.raOtherArchives = raOtherArchives;
 
     var archiveDst = this.extractArchive(raArchive);
     var mapdv = new DataView(archiveDst.buffer);
 
-    var offsEnd = mapdv.getUint32(0x00);
-    var numModels = mapdv.getUint32(0x60);
-    var offsFileGroups = mapdv.getUint32(0x64);
-    var numFileGroups = mapdv.getUint32(0x68);
-    var offsModelTable = mapdv.getUint32(0x6C);
+    this.mapdv = mapdv;
 
-    for(var i = 0; i < numFileGroups; i++)
+    var offsEnd = mapdv.getUint32(0x000);
+    
+    var offsSphere          = mapdv.getUint32(0x00C)
+
+//  var offsUnkFilePtrs     = mapdv.getUint32(0x048); // here for documentation purposes
+    var numUnkFiles         = mapdv.getUint32(0x04C);
+    var offsUnkFileGroups   = mapdv.getUint32(0x050);
+    var numUnkFileGroups    = mapdv.getUint32(0x054);
+    var offsUnkTable        = mapdv.getUint32(0x058);
+//  var offsMeshFilePtrs    = mapdv.getUint32(0x05C)
+    var numMeshFiles        = mapdv.getUint32(0x060);
+    var offsMeshFileGroups  = mapdv.getUint32(0x064);
+    var numMeshFileGroups   = mapdv.getUint32(0x068);
+    var offsMeshTable       = mapdv.getUint32(0x06C);
+    //                                        0x070 00000000
+    var offsUnk2FilePtrs    = mapdv.getUint32(0x074);
+    var numUnk2Files        = mapdv.getUint32(0x078);
+    var offsUnk2FileGroups  = mapdv.getUint32(0x07C);
+    var numUnk2FileGroups   = mapdv.getUint32(0x080);
+    //                                        0x084 00000000
+    //                                        0x088 00000000
+    var offsUnk2Table       = mapdv.getUint32(0x08C);
+//  var offsPathFilePtrs0   = mapdv.getUint32(0x090);
+    var numPathFiles0       = mapdv.getUint32(0x094);
+    var offsPathFileGroups0 = mapdv.getUint32(0x098);
+    var numPathFileGroups0  = mapdv.getUint32(0x09C);
+    var unkA0               = mapdv.getUint32(0x0A0);
+    var offsPathTable0      = mapdv.getUint32(0x0A4);
+//  var offsPathFilePtrs1   = mapdv.getUint32(0x0A8);
+    var numPathFiles1       = mapdv.getUint32(0x0AC);
+    var offsPathFileGroups1 = mapdv.getUint32(0x0B0);
+    var numPathFileGroups1  = mapdv.getUint32(0x0B4);
+    var unkB8               = mapdv.getUint32(0x0B8);
+    var offsPathTable1      = mapdv.getUint32(0x0BC);
+//  var offsPathFilePtrs2   = mapdv.getUint32(0x0C0);
+    var numPathFiles2       = mapdv.getUint32(0x0C4);
+    var offsPathFileGroups2 = mapdv.getUint32(0x0C8);
+    var numPathFileGroups2  = mapdv.getUint32(0x0CC);
+    var unkD0               = mapdv.getUint32(0x0D0);
+    var offsPathTable2      = mapdv.getUint32(0x0D4);
+//  var offsPathFilePtrs2   = mapdv.getUint32(0x0D8);
+    var numPathFiles3       = mapdv.getUint32(0x0DC);
+    var offsPathFileGroups3 = mapdv.getUint32(0x0E0);
+    var numPathFileGroups3  = mapdv.getUint32(0x0E4);
+    var unkE8               = mapdv.getUint32(0x0E8);
+    var offsPathTable3      = mapdv.getUint32(0x0EC);
+//  var numUnkPathPtrs      = mapdv.getUint32(0x0F0);
+    var numUnkPathFiles     = mapdv.getUint32(0x0F4);
+    var offsUnkPathGroups   = mapdv.getUint32(0x0F8);
+    var numUnkPathGroups    = mapdv.getUint32(0x0FC);
+    var offsUnkPathTable    = mapdv.getUint32(0x100);
+    //                                        0x104
+    var offsTiltLines       = mapdv.getUint32(0x108);
+    var numTiltLines        = mapdv.getUint32(0x10C);
+
+    var offsUnkGeom         = 0x334;
+
+    var numCoinGroups       = mapdv.getUint16(0x3B0);
+    var numSomething2       = mapdv.getUint16(0x3B4);
+    var numBoosters         = mapdv.getUint16(0x3B8);
+    var offsCoinGroups      = mapdv.getUint32(0x3C4);
+    var offsSomething2      = mapdv.getUint32(0x3C8);
+    //                                        0x3CC 00000000
+    var offsBoosters        = mapdv.getUint32(0x3D0);
+
+    var unkFiles = this.loadArchiveGroup(numUnkFiles, offsUnkFileGroups, numUnkFileGroups, offsUnkTable); // collision?
+    var meshFiles = this.loadArchiveGroup(numMeshFiles, offsMeshFileGroups, numMeshFileGroups, offsMeshTable);
+    var unk2Files = this.loadArchiveGroup(numUnk2Files, offsUnk2FileGroups, numUnk2FileGroups, offsUnk2Table);
+    var pathFiles0 = this.loadArchiveGroup(numPathFiles0, offsPathFileGroups0, numPathFileGroups0, offsPathTable0);
+    var pathFiles1 = this.loadArchiveGroup(numPathFiles1, offsPathFileGroups1, numPathFileGroups1, offsPathTable1);
+    var pathFiles2 = this.loadArchiveGroup(numPathFiles2, offsPathFileGroups2, numPathFileGroups2, offsPathTable2);
+    var pathFiles3 = this.loadArchiveGroup(numPathFiles3, offsPathFileGroups3, numPathFileGroups3, offsPathTable3);
+    var unkPathFiles = this.loadArchiveGroup(numUnkPathFiles, offsUnkPathGroups, numUnkPathGroups, offsUnkPathTable);
+
+    // note: pathFiles3 is empty for every level
+
+    this.sceneAddUnknownSphere(offsSphere); // skydome? need to find translation values
+    this.sceneAddTrackModel(meshFiles);
+    this.sceneAddUnk2(unk2Files); // path
+    this.sceneAddPath(pathFiles0, 0xFF0000);
+    this.sceneAddPath(pathFiles1, 0x00FF00);
+    this.sceneAddPath(pathFiles2, 0x0000FF);
+    this.sceneAddPath(pathFiles3, 0xFF00FF);
+    this.sceneAddTiltLines(offsTiltLines, numTiltLines);
+    this.sceneAddCoinGroups(offsCoinGroups, numCoinGroups);
+    this.sceneAddUnkPath(unkPathFiles); // another path type, doesn't seem to line up well with track model for some reason
+    //this.sceneAddUnkGeom(offsUnkGeom);
+    this.sceneAddBoosters(offsBoosters, numBoosters);
+}
+
+Viewer.prototype.sceneAddCoinGroups = function(offsCoinGroups, numCoinGroups)
+{
+    for(var i = 0; i < numCoinGroups; i++)
     {
-        var offsFileGroupHdr = mapdv.getUint32(offsFileGroups + i * 4);
-        var numFiles = mapdv.getUint32(offsFileGroupHdr + 0x00);
-        var offsFileIndices = mapdv.getUint32(offsFileGroupHdr + 0x04);
+        var geom = new THREE.Geometry();
+        var boundingGeom = new THREE.Geometry();
+        var pointsMaterial = new THREE.PointsMaterial({ color: 0xFF0000, size: 10, sizeAttenuation: false });
+        var boundingPointsMaterial = new THREE.PointsMaterial({ color: 0xFF0000, size: 3, sizeAttenuation: false });
 
-        for(var j = 0; j < numFiles; j++)
+        var offsCoinGroup = offsCoinGroups + (i * 0x38);
+
+        var numCoins   = this.mapdv.getUint8(offsCoinGroup + 0x00);
+        var xmin       = this.mapdv.getFloat32(offsCoinGroup + 0x0C);
+        var ymin       = this.mapdv.getFloat32(offsCoinGroup + 0x10);
+        var zmin       = this.mapdv.getFloat32(offsCoinGroup + 0x14);
+        var xmax       = this.mapdv.getFloat32(offsCoinGroup + 0x18);
+        var ymax       = this.mapdv.getFloat32(offsCoinGroup + 0x1C);
+        var zmax       = this.mapdv.getFloat32(offsCoinGroup + 0x20);
+        var offsCoins  = this.mapdv.getUint32(offsCoinGroup + 0x24);
+
+        boundingGeom.vertices.push(new THREE.Vector3(-xmin*32, zmin*32, ymin*32));
+        boundingGeom.vertices.push(new THREE.Vector3(-xmax*32, zmax*32, ymax*32));
+
+        for(var j = 0; j < numCoins; j++)
         {
-            var fileIndex = mapdv.getUint16(offsFileIndices + j * 2);
-            
-            var offsEntry = offsModelTable + fileIndex * 12;
-            var offsModelStart = mapdv.getUint32(offsEntry + 0x00);
-            var offsModelEnd = mapdv.getUint32(offsEntry + 0x04);
-            var offsModelMeta = mapdv.getUint32(offsEntry + 0x08);
-            var modelRomAddr = (raOtherArchives + offsModelStart);
-            var modelRomAddrEnd = (raOtherArchives + offsModelEnd);
+            var offsCoin = offsCoins + (j * 16);
+            var x = this.mapdv.getFloat32(offsCoin + 0x00);
+            var y = this.mapdv.getFloat32(offsCoin + 0x04);
+            var z = this.mapdv.getFloat32(offsCoin + 0x08);
+            geom.vertices.push(new THREE.Vector3(-x*32, z*32, y*32));
+        }
 
-            var modeldv = new DataView(this.extractArchive(modelRomAddr).buffer);
-            this.loadModel(modeldv, offsModelMeta)
+        var points = new THREE.Points(geom, pointsMaterial);
+        var boundingPoints = new THREE.Points(boundingGeom, boundingPointsMaterial);
+        var boundingBox = new THREE.BoxHelper(boundingPoints, 0xFFFF00);
+
+        this.scene.add(points);
+        this.scene.add(boundingPoints);
+        this.scene.add(boundingBox);
+    }
+}
+
+Viewer.prototype.sceneAddBoosters = function(offsBoosters, numBoosters)
+{
+    for(var i = 0; i < numBoosters; i++)
+    {
+        var offset = offsBoosters + i * 0x38;
+        var count = this.mapdv.getUint8(offset + 0x03);
+        var offsListA = this.mapdv.getUint32(offset + 0x30);
+        var offsListB = this.mapdv.getUint32(offset + 0x34);
+
+        for(var j = 0; j < count; j++)
+        {
+            var offsetA = offsListA + (j * 12);
+            var offsetB = offsListB + (j * 12);
+
+            var x0 = this.mapdv.getFloat32(offsetA + 0x00);
+            var y0 = this.mapdv.getFloat32(offsetA + 0x04);
+            var z0 = this.mapdv.getFloat32(offsetA + 0x08);
+            var x1 = this.mapdv.getFloat32(offsetB + 0x00);
+            var y1 = this.mapdv.getFloat32(offsetB + 0x04);
+            var z1 = this.mapdv.getFloat32(offsetB + 0x08);
+
+            var geom = new THREE.Geometry();
+            var lineMaterial = new THREE.LineBasicMaterial({ color: 0x00FFFF });
+            var pointsMaterial = new THREE.PointsMaterial({ color: 0x00FFFF, size: 5, sizeAttenuation: false });
+            geom.vertices.push(new THREE.Vector3(-x0*32, z0*32, y0*32))
+            geom.vertices.push(new THREE.Vector3(-x1*32, z1*32, y1*32))
+            var line = new THREE.Line(geom, lineMaterial);
+            var points = new THREE.Points(geom, pointsMaterial);
+            this.scene.add(line);
+            this.scene.add(points);
         }
     }
+}
+
+Viewer.prototype.sceneAddUnk2 = function(fileGroup)
+{
+    for(var nGroup in fileGroup.groups)
+    {
+        var indices = fileGroup.groups[nGroup];
+        for(var i in indices)
+        {
+            var index = indices[i];
+            var file = fileGroup.files[index];
+            
+            var geom = new THREE.Geometry();
+            var pointsMaterial = new THREE.PointsMaterial({ color: randColor24(100), size: 5, sizeAttenuation: false });
+
+            var unk0C = file.dv.getFloat32(0x0C);
+            var unk10 = file.dv.getFloat32(0x10);
+            //console.log(unk0C, unk10);
+
+            var count = file.dv.getUint32(0x08);
+            for(var j = 0; j < count; j++)
+            {
+                var offset = 0x28 + j * 0x1C;
+                var x = file.dv.getFloat32(offset + 0x00);
+                var y = file.dv.getFloat32(offset + 0x04);
+                var z = file.dv.getFloat32(offset + 0x08);
+                geom.vertices.push(new THREE.Vector3(-x*32, z*32, y*32))
+            }
+
+            var points = new THREE.Points(geom, pointsMaterial);
+            this.scene.add(points);
+        }
+    }
+
+}
+
+Viewer.prototype.sceneAddUnkGeom = function(offsUnkGeom)
+{
+    var geom = new THREE.Geometry();
+    var pointsMaterial = new THREE.PointsMaterial({ color: 0x00FFFF, size: 10, sizeAttenuation: false });
+    for(var i = 0; i < 8; i++)
+    {
+        var offset = offsUnkGeom + i * 12;
+        var x = this.mapdv.getFloat32(offset + 0x00);
+        var y = this.mapdv.getFloat32(offset + 0x04);
+        var z = this.mapdv.getFloat32(offset + 0x08);
+        geom.vertices.push(new THREE.Vector3(-x*32, z*32, y*32))
+    }
+    var points = new THREE.Points(geom, pointsMaterial);
+    this.scene.add(points);
+}
+
+Viewer.prototype.sceneAddUnkPath = function(fileGroup)
+{
+    var lineMaterial = new THREE.LineBasicMaterial({ color: 0xFFFF00 });
+    var pointsMaterial = new THREE.PointsMaterial({ color: 0xFFFF00, size: 5, sizeAttenuation: false });
+    
+    for(var nGroup in fileGroup.groups)
+    {
+        var indices = fileGroup.groups[nGroup];
+        for(var i in indices)
+        {
+            var index = indices[i];
+            var file = fileGroup.files[index];
+
+            var count = file.dv.getUint32(0x00) + 1;
+            var geom = new THREE.Geometry();
+
+            for(var j = 0; j < count; j++)
+            {
+                var offset = j * 16;
+                var x = file.dv.getFloat32(offset + 0x04);
+                var y = file.dv.getFloat32(offset + 0x08);
+                var z = file.dv.getFloat32(offset + 0x0C);
+                geom.vertices.push(new THREE.Vector3(-x * 32, z * 32, y * 32))
+            }
+        
+            var points = new THREE.Points(geom, pointsMaterial);
+            var line = new THREE.Line(geom, lineMaterial);
+            this.scene.add(points);
+            this.scene.add(line);
+        }
+    }
+}
+
+Viewer.prototype.sceneAddTiltLines = function(offsTiltLines, numTiltLines)
+{
+    var lineMaterial = new THREE.LineBasicMaterial({color: 0x888888});
+    var pointsMaterial = new THREE.PointsMaterial({ color: 0x888888, size: 5, sizeAttenuation: false });
+
+    for(var i = 0; i < numTiltLines; i++)
+    {
+        var offset = offsTiltLines + i * 0x2C;
+        // todo 00, 04
+        var x0 = this.mapdv.getFloat32(offset + 0x08);
+        var y0 = this.mapdv.getFloat32(offset + 0x0C);
+        var z0 = this.mapdv.getFloat32(offset + 0x10);
+        var x1 = this.mapdv.getFloat32(offset + 0x14);
+        var y1 = this.mapdv.getFloat32(offset + 0x18);
+        var z1 = this.mapdv.getFloat32(offset + 0x1C);
+        // todo 20, 24, 28
+
+        var geom = new THREE.Geometry();
+        geom.vertices.push(new THREE.Vector3(-x0 * 32, z0 * 32, y0 * 32))
+        geom.vertices.push(new THREE.Vector3(-x1 * 32, z1 * 32, y1 * 32));
+
+        var points = new THREE.Points(geom, pointsMaterial);
+        var line = new THREE.Line(geom, pointsMaterial);
+
+        this.scene.add(points);
+        this.scene.add(line);
+    }
+}
+
+Viewer.prototype.sceneAddUnknownSphere = function(offsUnk)
+{
+    //var x = this.mapdv.getFloat32(0x20);
+    //var y = this.mapdv.getFloat32(0x24);
+    //var z = this.mapdv.getFloat32(0x28);
+    //var geom2 = new THREE.Geometry();
+    //geom2.vertices.push(new THREE.Vector3(x, z, y));
+    //var pointsMaterial = new THREE.PointsMaterial({ color: 0xFFFFFF, size: 20, sizeAttenuation: false });
+    //var pointField = new THREE.Points(geom2, pointsMaterial);
+    //this.scene.add(pointField)
+
+    var offsVertices = this.mapdv.getUint32(offsUnk + 0x00);
+    var numVertices = this.mapdv.getUint32(offsUnk + 0x04);
+    var offsFaces = this.mapdv.getUint32(offsUnk + 0x08);
+    var numFaces = this.mapdv.getUint32(offsUnk + 0x0C);
+//  var offsSomething = this.mapdv.getUint32(offsUnk + 0x10);
+//  var numSomething = this.mapdv.getUint32(offsUnk + 0x14);
+//  var offsSomething2 = this.mapdv.getUint32(offsUnk + 0x18);
+//  var numSomething2 = this.mapdv.getUint32(offsUnk + 0x1C);
+
+    var geom = new THREE.Geometry();
+
+    for(var i = 0; i < numVertices; i++)
+    {
+        var offset = offsVertices + i * 6;
+        var vertex = new ModelVertex(this.mapdv, offset);
+
+        geom.vertices.push(new THREE.Vector3(
+            -vertex.x * 32,
+            vertex.z * 32,
+            vertex.y * 32));
+    }
+
+    for(var i = 0; i < numFaces; i++)
+    {
+        var offsFace = offsFaces + (i * ModelFace.SIZE);
+        var face = new ModelFace(this.mapdv, offsFace);
+
+        geom.faces.push(new THREE.Face3( face.vidx0, face.vidx1, face.vidx2));
+
+        if(face.vidx3 != -1)
+        {
+            geom.faces.push(new THREE.Face3(face.vidx0, face.vidx2, face.vidx3));
+        }
+    }
+
+    var material = new THREE.MeshBasicMaterial({ color: 0xFFFFFF, wireframe: true });
+    var mesh = new THREE.Mesh(geom, material);
+
+    this.scene.add(mesh);
+}
+
+Viewer.prototype.sceneAddTrackModel = function(fileGroup)
+{
+    for(var nGroup in fileGroup.groups)
+    {
+        var indices = fileGroup.groups[nGroup];
+        for(var i in indices)
+        {
+            var index = indices[i];
+            var file = fileGroup.files[index];
+            this.addMesh(file);
+        }
+    }
+}
+
+Viewer.prototype.sceneAddPath = function(fileGroup, color)
+{
+    var geom = new THREE.Geometry();
+    var lineMaterial = new THREE.LineBasicMaterial({color: color});
+    var pointsMaterial = new THREE.PointsMaterial({ color: color, size: 3, sizeAttenuation: false });
+
+    // only group 0 seems to be used
+    for(var nGroup in fileGroup.groups)
+    {
+        var indices = fileGroup.groups[nGroup];
+
+        for(var i in indices)
+        {
+            var index = indices[i];
+            var file = fileGroup.files[index];
+
+            var numPoints = file.dv.getUint32(0x08);
+
+            for(var j = 0; j < numPoints; j++)
+            {
+                var offset = 0x18 + (j * 12);
+                var x = file.dv.getFloat32(offset + 0x00);
+                var y = file.dv.getFloat32(offset + 0x04);
+                var z = file.dv.getFloat32(offset + 0x08);
+
+                geom.vertices.push(new THREE.Vector3(
+                    -x * 32,
+                    z * 32,
+                    y * 32
+                ));
+            }
+        }
+    }
+
+    var pointField = new THREE.Points(geom, pointsMaterial);
+    var line = new THREE.Line(geom, lineMaterial);
+
+    this.scene.add(pointField);
+    this.scene.add(line);
 }
 
 Viewer.prototype.loadRom = function(ab)
@@ -281,14 +688,14 @@ function ArchiveHeader(dv, offset)
 
 ArchiveHeader.SIZE = 8;
 
-function ModelMeta(dv, offset)
+function MeshMeta(dv, offset)
 {
     this.unk00        = dv.getUint32(offset + 0x00);
     this.unk04        = dv.getUint32(offset + 0x04);
     this.offsGeomMeta = dv.getUint32(offset + 0x08);
-    this.modelX       = (dv.getInt32(offset + 0x0C) / 2048);
-    this.modelY       = (dv.getInt32(offset + 0x10) / 2048);
-    this.modelZ       = (dv.getInt32(offset + 0x14) / 2048);
+    this.meshX        = (dv.getInt32(offset + 0x0C) / 2048);
+    this.meshY        = (dv.getInt32(offset + 0x10) / 2048);
+    this.meshZ        = (dv.getInt32(offset + 0x14) / 2048);
     this.unk18        = dv.getUint32(offset + 0x18);
     this.unk1C        = dv.getUint32(offset + 0x1C);
     this.unk20        = dv.getUint32(offset + 0x20);
@@ -340,21 +747,21 @@ function randColor24(minGamma)
     return (r << 16 | g << 8 | b);
 }
 
-Viewer.prototype.loadModel = function(modeldv, offsModelHeader)
+Viewer.prototype.addMesh = function(file)
 {
     var geom = new THREE.Geometry();
     
-    var modelMeta = new ModelMeta(modeldv, offsModelHeader);
-    var geomMeta = new GeometryMeta(modeldv, modelMeta.offsGeomMeta);
+    var meshMeta = new MeshMeta(file.dv, file.offsMeta);
+    var geomMeta = new GeometryMeta(file.dv, meshMeta.offsGeomMeta);
 
     for(var i = 0; i < geomMeta.numVertices; i++)
     {
         var offsVertex = geomMeta.offsVertices + (i * ModelVertex.SIZE);
-        var vertex = new ModelVertex(modeldv, offsVertex);
+        var vertex = new ModelVertex(file.dv, offsVertex);
         var vec3 = new THREE.Vector3(
-            (vertex.x + modelMeta.modelX) * -1.0,
-            (vertex.z + modelMeta.modelZ),
-            (vertex.y + modelMeta.modelY)
+            (vertex.x + meshMeta.meshX) * -1.0,
+            (vertex.z + meshMeta.meshZ),
+            (vertex.y + meshMeta.meshY)
         );
         geom.vertices.push(vec3);
     }
@@ -362,7 +769,7 @@ Viewer.prototype.loadModel = function(modeldv, offsModelHeader)
     for(var i = 0; i < geomMeta.numFaces; i++)
     {
         var offsFace = geomMeta.offsFaces + (i * ModelFace.SIZE);
-        var face = new ModelFace(modeldv, offsFace);
+        var face = new ModelFace(file.dv, offsFace);
         geom.faces.push(new THREE.Face3(face.vidx0, face.vidx1, face.vidx2));
         if(face.vidx3 != -1)
         {
@@ -373,7 +780,6 @@ Viewer.prototype.loadModel = function(modeldv, offsModelHeader)
     var mat = new THREE.MeshBasicMaterial({ color: randColor24(50), wireframe: true });
     var obj = new THREE.Mesh(geom, mat);
     this.scene.add(obj);
-
 }
 
 //////////////////////////////////////////////////
@@ -403,3 +809,5 @@ var viewer = new Viewer('#container');
 viewer.animate();
 
 </script>
+</body>
+</html>
