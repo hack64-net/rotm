@@ -71,12 +71,12 @@ function MapHeader(mapdv)
     this.offsBoosters            = mapdv.getUint32(0x3D0);
 }
 
-function ArchiveHeader(dv, offset)
+function CompressedFileHeader(dv, offset)
 {
     this.srcSize = dv.getUint32(offset + 0x00);
     this.dstSize = dv.getUint32(offset + 0x04);
 }
-ArchiveHeader.SIZE = 8;
+CompressedFileHeader.SIZE = 8;
 
 function ObjectMeta(dv, offset)
 {
@@ -122,10 +122,10 @@ function MeshMeta(dv, offset)
 
 function GeometryMeta(dv, offset)
 {
-    this.offsVertices = dv.getUint32(offset + 0x00);
-    this.numVertices  = dv.getUint32(offset + 0x04);
-    this.offsFaces    = dv.getUint32(offset + 0x08);
-    this.numFaces     = dv.getUint32(offset + 0x0C);
+    this.offsVertices  = dv.getUint32(offset + 0x00);
+    this.numVertices   = dv.getUint32(offset + 0x04);
+    this.offsFaces     = dv.getUint32(offset + 0x08);
+    this.numFaces      = dv.getUint32(offset + 0x0C);
     this.offsTexCoords = dv.getUint32(offset + 0x10);
     this.numTexCoords  = dv.getUint32(offset + 0x14);
     this.offsColors    = dv.getUint32(offset + 0x18);

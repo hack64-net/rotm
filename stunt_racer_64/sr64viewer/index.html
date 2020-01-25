@@ -2,12 +2,28 @@
 <head>
 <meta charset="utf-8">
 <title>SR64 Viewer</title>
+<link href='https://fonts.googleapis.com/css?family=Open+Sans:400,400italic,700,700italic' rel='stylesheet' type='text/css'>
+<style>
+label
+{
+    user-select: none;
+}
+
+body, input, button, label, select
+{
+    font-family: "Open Sans";
+}
+
+select
+{
+    padding: 1px 6px;
+}
+</style>
 </head>
 <script src="three.min.js"></script>
 <script src="pako.min.js"></script>
 <script src="structs.js"></script>
 <body style="background: #111; color: #FFF;">
-
 <div style="text-align: center;">
     <div>
         <div style="padding-bottom: 10px; text-align: left;"><input type="file" id="file"></div>
@@ -27,9 +43,24 @@ function Viewer(queryDomContainer)
     this.scene = new THREE.Scene();
     this.renderer = new THREE.WebGLRenderer({antialias: false});
 
+    this.objects = {
+        skydome:        { label: 'Skydome?',        visible: true, objects: [] },
+        collision:      { label: 'Collision',       visible: true, objects: [] },
+        trackMesh:      { label: 'Track Mesh',      visible: true, objects: [] },
+        paths:          { label: 'Paths',           visible: true, objects: [] },
+        otherPath:      { label: 'Other Path',      visible: true, objects: [] },
+        otherPath2:     { label: 'Other Path 2',    visible: true, objects: [] },
+        tiltLines:      { label: 'Tilt Lines',      visible: true, objects: [] },
+        coinGroups:     { label: 'Coin Groups',     visible: true, objects: [] },
+        sceneryObjects: { label: 'Scenery Objects', visible: true, objects: [] },
+        boosters:       { label: 'Booster Lines',   visible: true, objects: [] },
+    };
+
+    this.initDOM(queryDomContainer);
+
     this.mapdv = null;
     this.mapIndex = 0;
-    this.raOtherArchives = 0;
+    this.raOtherFiles = 0;
 
     this.keysDown = {};
 
@@ -40,7 +71,7 @@ function Viewer(queryDomContainer)
     this.camRotSpeedX = 0;
     this.camRotSpeedY = 0;
 
-    this.width = 960;
+    this.width = 1280;
     this.height = 720;
 
     this.renderer.setPixelRatio(window.devicePixelRatio);
@@ -51,64 +82,33 @@ function Viewer(queryDomContainer)
     this.renderer.setViewport(0, 0, this.width, this.height);
     this.renderer.setScissor(0, 0, this.width, this.height);
 
-    this.renderer.domElement.tabIndex = '0'
-    this.renderer.domElement.viewer = this;
-
-    var domContainer = document.querySelector(queryDomContainer);
-    var domSelectDiv = document.createElement('div');
-    this.domSelect = document.createElement('select');
-    this.domSaveBtn = document.createElement('button');
-    this.domSaveBtn.innerHTML = "Download map data";
-
-    this.domSaveBtn.addEventListener('click', function(e)
-    {
-        saveAs("map_" + _this.mapIndex.hex(2) + ".bin", _this.mapdv.buffer);
-    });
-
-    this.domSelect.setAttribute('disabled', '')
-    this.domSelect.addEventListener('change', function(e)
-    {
-        var mapIndex = (this.value | 0);
-        _this.loadMap(mapIndex);
-    })
-
-    for(var i = 0; i < NUM_SR64_LEVELS; i++)
-    {
-        var domOption = document.createElement('option');
-        domOption.innerHTML = "Level 0" + i.toString(16).toUpperCase();
-        domOption.setAttribute('value', i);
-        this.domSelect.appendChild(domOption);
-    }
-
-    domSelectDiv.appendChild(this.domSelect);
-    domSelectDiv.appendChild(this.domSaveBtn);
-    domContainer.appendChild(domSelectDiv);
-    domContainer.appendChild(this.renderer.domElement);
-
     this.camera = new THREE.PerspectiveCamera(60, this.width/this.height, 1, 100000);
     this.camera.rotation.order = "YXZ";
 
-    this.renderer.domElement.onkeydown = function(e)
+    this.dom['render'].tabIndex = '0'
+    this.dom['render'].style.display = "inline-block";
+
+    this.dom['render'].onkeydown = function(e)
     {
-        this.viewer.keysDown[e.keyCode] = true;
+        _this.keysDown[e.keyCode] = true;
     	e.preventDefault();
     	return false;
     }
 
-    this.renderer.domElement.onkeyup = function(e)
+    this.dom['render'].onkeyup = function(e)
     {
-    	delete this.viewer.keysDown[e.keyCode];
+    	delete _this.keysDown[e.keyCode];
     	e.preventDefault();
     	return false;
     }
 
-    this.renderer.domElement.oncontextmenu = function(e)
+    this.dom['render'].oncontextmenu = function(e)
     {
         e.preventDefault();
         return false;
     }
 
-    this.renderer.domElement.onmousedown = function(e)
+    this.dom['render'].onmousedown = function(e)
     {
         this.requestPointerLock();
         this.focus();
@@ -119,7 +119,7 @@ function Viewer(queryDomContainer)
     var lastMovementX = 0;
     var lastMovementY = 0;
 
-    this.renderer.domElement.onmousemove = function(e)
+    this.dom['render'].onmousemove = function(e)
     {
         if(e.buttons == 0)
         {
@@ -152,7 +152,7 @@ function Viewer(queryDomContainer)
         }
     }
 
-    this.renderer.domElement.onmouseup = function(e)
+    this.dom['render'].onmouseup = function(e)
     {
         lastMovementX = 0;
         lastMovementY = 0;
@@ -172,6 +172,86 @@ function Viewer(queryDomContainer)
 	    37: function(viewer){ viewer.camRotSpeedY =  20;;}, // left - rotate left
 	    39: function(viewer){ viewer.camRotSpeedY = -20;}  // right - rotate right
     }
+}
+
+Viewer.prototype.initDOM = function(queryDomContainer)
+{
+    var _this = this;
+
+    var dom = {
+        'container': document.querySelector(queryDomContainer),
+        'toolbarPane': document.createElement('div'),
+        'mainPane': document.createElement('div'),
+        'togglePane': document.createElement('div'),
+        'select': document.createElement('select'),
+        'saveBtn': document.createElement('button'),
+        'render': this.renderer.domElement
+    };
+
+    dom['container'].appendChild(dom['toolbarPane']);
+    dom['container'].appendChild(dom['mainPane']);
+    dom['mainPane'].appendChild(dom['render']);
+    dom['mainPane'].appendChild(dom['togglePane']);
+    dom['toolbarPane'].appendChild(dom['select']);
+    dom['toolbarPane'].appendChild(dom['saveBtn']);
+
+    dom['saveBtn'].innerHTML = "Download map data";
+    dom['container'].style = "background-color: #222; padding: 20px;";
+    dom['toolbarPane'].style = "padding-top: 10px; padding-bottom: 10px;";
+    dom['togglePane'].style = "padding-left: 10px; display: inline-block; vertical-align: top;";
+    dom['select'].style = "margin-right: 10px;";
+    dom['select'].setAttribute('disabled', '');
+
+    dom['saveBtn'].addEventListener('click', function(e)
+    {
+        saveAs("map_" + _this.mapIndex.hex(2) + ".bin", _this.mapdv.buffer);
+    });
+
+    dom['select'].addEventListener('change', function(e)
+    {
+        var mapIndex = (this.value | 0);
+        _this.loadMap(mapIndex);
+    })
+
+    for(var i = 0; i < NUM_SR64_LEVELS; i++)
+    {
+        var domOption = document.createElement('option');
+        domOption.innerHTML = "Level 0" + i.toString(16).toUpperCase();
+        domOption.setAttribute('value', i);
+        dom['select'].appendChild(domOption);
+    }
+
+    for(var key in this.objects)
+    {
+        var domDiv = document.createElement('div');
+        var domLabel = document.createElement('label');
+        var domCheck = document.createElement('input');
+
+        domCheck.setAttribute('type', 'checkbox')
+        domCheck.setAttribute('name', key);
+        domCheck.checked = true;
+
+        domDiv.appendChild(domLabel);
+        domLabel.appendChild(domCheck);
+        domLabel.appendChild(new Text(this.objects[key].label));
+        dom['togglePane'].appendChild(domDiv);
+
+        domCheck.addEventListener('change', (e) =>
+        {
+            var k = e.target.getAttribute('name');
+            this.objects[k].visible = e.target.checked;
+            var objectGroups = this.objects[k].objects;
+            for(var i in objectGroups)
+            {
+                for(var j in objectGroups[i])
+                {
+                    objectGroups[i][j].visible = e.target.checked;
+                }
+            }
+        });
+    }
+
+    this.dom = dom;
 }
 
 Viewer.prototype.animate = function()
@@ -204,12 +284,12 @@ Viewer.prototype.animate = function()
     requestAnimationFrame(this.animate.bind(this));
 }
 
-Viewer.prototype.extractArchive = function(romOffset)
+Viewer.prototype.extractFile = function(romOffset)
 {
-    var header = new ArchiveHeader(this.dv, romOffset);
-    romOffset += ArchiveHeader.SIZE;
+    var header = new CompressedFileHeader(this.dv, romOffset);
+    romOffset += CompressedFileHeader.SIZE;
 
-    var archiveDst = new Uint8Array(header.dstSize);
+    var fileDst = new Uint8Array(header.dstSize);
     var numBytesWritten = 0;
 
     while(numBytesWritten < header.dstSize)
@@ -222,17 +302,17 @@ Viewer.prototype.extractArchive = function(romOffset)
 
         for(var i = 0; i < blockDst.byteLength; i++)
         {
-            archiveDst[numBytesWritten + i] = blockDst[i];
+            fileDst[numBytesWritten + i] = blockDst[i];
         }
 
         romOffset += (blockSrcSize + 1) & 0xFFFFFFFE;
         numBytesWritten += blockDst.byteLength;
     }
 
-    return archiveDst;
+    return new DataView(fileDst.buffer);
 }
 
-Viewer.prototype.loadArchiveGroup = function(numFiles, offsFileGroups, numFileGroups, offsFileTable, bVerbose)
+Viewer.prototype.loadFileGroup = function(numFiles, offsFileGroups, numFileGroups, offsFileTable, bVerbose)
 {
     var files = [];
     var groups = [];
@@ -240,18 +320,18 @@ Viewer.prototype.loadArchiveGroup = function(numFiles, offsFileGroups, numFileGr
     for(var i = 0; i < numFiles; i++)
     {
         var offsEntry         = (offsFileTable + i * 12);
-        var offsArchiveStart  = this.mapdv.getUint32(offsEntry + 0x00);
-        var offsArchiveEnd    = this.mapdv.getUint32(offsEntry + 0x04);
+        var offsFileStart  = this.mapdv.getUint32(offsEntry + 0x00);
+        var offsFileEnd    = this.mapdv.getUint32(offsEntry + 0x04);
         var offsMeta          = this.mapdv.getUint32(offsEntry + 0x08);
-        var archiveRomAddr    = (this.raOtherArchives + offsArchiveStart);
-        var archiveRomAddrEnd = (this.raOtherArchives + offsArchiveEnd);
+        var fileRomAddr    = (this.raOtherFiles + offsFileStart);
+        var fileRomAddrEnd = (this.raOtherFiles + offsFileEnd);
         
         if(bVerbose)
         {
-            console.log("extracted archive from " + (archiveRomAddr + 0x0C).toString(16));
+            console.log("extracted file from " + (fileRomAddr + 0x0C).toString(16));
         }
 
-        var filedv = new DataView(this.extractArchive(archiveRomAddr).buffer);
+        var filedv = this.extractFile(fileRomAddr);
         files.push({ dv: filedv, offsMeta: offsMeta });
     }
 
@@ -284,30 +364,29 @@ Viewer.prototype.loadMap = function(index)
         this.scene.remove(this.scene.children[0]); 
     }
 
-    var raArchiveEntry = 0x000BBDA0 + index * 0x5C;
-    var raArchive = this.dv.getUint32(raArchiveEntry + 0x14);
-    //var raUnk = dv.getUint32(raArchiveEntry + 0x18);
+    for(var key in this.objects)
+    {
+        this.objects[key].objects = [];
+    }
 
-    var archiveSrcSize = this.dv.getUint32(raArchive + 0x00);
+    var raMapFileMeta = 0x000BBDA0 + index * 0x5C;
+    var raMapFile = this.dv.getUint32(raMapFileMeta + 0x14);
+    var mapFileSrcSize = this.dv.getUint32(raMapFile + 0x00);
+    //var raUnk = dv.getUint32(raFileEntry + 0x18);
 
-    var raOtherArchives = raArchive + archiveSrcSize; // probably not the right way to obtain this
-    this.raOtherArchives = raOtherArchives;
+    this.mapdv = this.extractFile(raMapFile);
+    this.raOtherFiles = raMapFile + mapFileSrcSize; // probably not the right way to obtain this
 
-    var archiveDst = this.extractArchive(raArchive);
-    var mapdv = new DataView(archiveDst.buffer);
+    var map = new MapHeader(this.mapdv);
 
-    this.mapdv = mapdv;
-
-    var map = new MapHeader(mapdv);
-
-    var collisionFiles = this.loadArchiveGroup(map.numCollisionFiles, map.offsCollisionFileGroups, map.numCollisionFileGroups, map.offsCollisionTable); // collision?
-    var meshFiles = this.loadArchiveGroup(map.numMeshFiles, map.offsMeshFileGroups, map.numMeshFileGroups, map.offsMeshTable);
-    var unk2Files = this.loadArchiveGroup(map.numUnk2Files, map.offsUnk2FileGroups, map.numUnk2FileGroups, map.offsUnk2Table);
-    var pathFiles0 = this.loadArchiveGroup(map.numPathFiles0, map.offsPathFileGroups0, map.numPathFileGroups0, map.offsPathTable0);
-    var pathFiles1 = this.loadArchiveGroup(map.numPathFiles1, map.offsPathFileGroups1, map.numPathFileGroups1, map.offsPathTable1);
-    var pathFiles2 = this.loadArchiveGroup(map.numPathFiles2, map.offsPathFileGroups2, map.numPathFileGroups2, map.offsPathTable2);
-    var pathFiles3 = this.loadArchiveGroup(map.numPathFiles3, map.offsPathFileGroups3, map.numPathFileGroups3, map.offsPathTable3);
-    var unkPathFiles = this.loadArchiveGroup(map.numUnkPathFiles, map.offsUnkPathGroups, map.numUnkPathGroups, map.offsUnkPathTable);
+    var collisionFiles = this.loadFileGroup(map.numCollisionFiles, map.offsCollisionFileGroups, map.numCollisionFileGroups, map.offsCollisionTable); // collision?
+    var meshFiles = this.loadFileGroup(map.numMeshFiles, map.offsMeshFileGroups, map.numMeshFileGroups, map.offsMeshTable);
+    var unk2Files = this.loadFileGroup(map.numUnk2Files, map.offsUnk2FileGroups, map.numUnk2FileGroups, map.offsUnk2Table);
+    var pathFiles0 = this.loadFileGroup(map.numPathFiles0, map.offsPathFileGroups0, map.numPathFileGroups0, map.offsPathTable0);
+    var pathFiles1 = this.loadFileGroup(map.numPathFiles1, map.offsPathFileGroups1, map.numPathFileGroups1, map.offsPathTable1);
+    var pathFiles2 = this.loadFileGroup(map.numPathFiles2, map.offsPathFileGroups2, map.numPathFileGroups2, map.offsPathTable2);
+    var pathFiles3 = this.loadFileGroup(map.numPathFiles3, map.offsPathFileGroups3, map.numPathFileGroups3, map.offsPathTable3);
+    var unkPathFiles = this.loadFileGroup(map.numUnkPathFiles, map.offsUnkPathGroups, map.numUnkPathGroups, map.offsUnkPathTable);
 
     // note: pathFiles3 is empty for every level
 
@@ -322,30 +401,20 @@ Viewer.prototype.loadMap = function(index)
     this.sceneAddTiltLines(map.offsTiltLines, map.numTiltLines);
     this.sceneAddCoinGroups(map.offsCoinGroups, map.numCoinGroups);
     this.sceneAddUnkPath(unkPathFiles); // another path type, doesn't seem to line up well with track model for some reason
-    this.sceneAddObjects(map.offsSceneryObjects, map.numSceneryObjects, map.offsDpTable);
+    this.sceneAddSceneryObjects(map.offsSceneryObjects, map.numSceneryObjects, map.offsDpTable);
     //this.sceneAddUnkGeom(map.offsUnkGeom);
     this.sceneAddBoosters(map.offsBoosters, map.numBoosters);
 }
 
-Number.prototype.hex = function(len)
+Viewer.prototype.sceneAdd = function(tag, objectArray)
 {
-    len = len || 8;
-    var s = this.toString(16).toUpperCase();
-    while(s.length < len) s = "0" + s;
-    return s;
-}
-
-function debuglog(jsobj)
-{
-    var s = jsobj.constructor.name + " { ";
-    var keys = Object.keys(jsobj);
-    for(var i in keys)
+    var visible = this.objects[tag].visible;
+    for(var i in objectArray)
     {
-        if(i != 0) s += ", ";
-        s += keys[i] + ": " + jsobj[keys[i]].hex();
+        objectArray[i].visible = visible;
+        this.scene.add(objectArray[i]);
     }
-    s += " }";
-    console.log(s);
+    this.objects[tag].objects.push(objectArray);
 }
 
 Viewer.prototype.sceneAddCollision = function(unkFiles)
@@ -394,7 +463,8 @@ Viewer.prototype.sceneAddCollision = function(unkFiles)
 
         var material = new THREE.MeshBasicMaterial({ color: 0x8800000, wireframe: true });
         var mesh = new THREE.Mesh(geom, material);
-        this.scene.add(mesh);
+        
+        this.sceneAdd('collision', [mesh]);
     }
 
     //function triMidPoint(v0, v1, v2)
@@ -461,7 +531,7 @@ Viewer.prototype.sceneAddCollision = function(unkFiles)
     //}
 }
 
-Viewer.prototype.sceneAddObjects = function(offsSceneryObjects, numSceneryObjects, offsDpTable)
+Viewer.prototype.sceneAddSceneryObjects = function(offsSceneryObjects, numSceneryObjects, offsDpTable)
 {
     for(var nObject = 0; nObject < numSceneryObjects; nObject++)
     {
@@ -470,14 +540,23 @@ Viewer.prototype.sceneAddObjects = function(offsSceneryObjects, numSceneryObject
         var position = new Vec3f(this.mapdv, objectMeta.offsPosition);
         var geomMeta = new GeometryMeta(this.mapdv, objectMeta.offsGeomMeta);
 
+        var colors = [];
+        var faceNormal = new THREE.Vector3(0, 0, 0);
+
         for(var numAnim = 0; numAnim < objectMeta.numAnimHeaders; numAnim++)
         {
             var offsAnimHeader = objectMeta.offsAnimHeaders + numAnim * AnimHeader.SIZE;
             var animHeader = new AnimHeader(this.mapdv, offsAnimHeader);
-            //debuglog(animHeader);
         }
 
         var geom = new THREE.Geometry();
+
+        for(var nColor = 0; nColor < geomMeta.numColors; nColor++)
+        {
+            var offsColor = geomMeta.offsColors + (nColor * 4);
+            var color = this.mapdv.getUint32(offsColor);
+            colors.push(color >>> 8);
+        }
 
         for(var nVertex = 0; nVertex < geomMeta.numVertices; nVertex++)
         {
@@ -491,35 +570,99 @@ Viewer.prototype.sceneAddObjects = function(offsSceneryObjects, numSceneryObject
             var offsFace = geomMeta.offsFaces + (nFace * MeshFace.SIZE);
             var face = new MeshFace(this.mapdv, offsFace);
 
-            //console.log(face.materialIndex.hex(2));
-            ///////////
-            //var offsDpMaterial = this.mapdv.getUint32(offsDpTable + face.materialIndex * 4);
-            //var s = "";
-            //for(var i = 0;;i++)
-            //{
-            //    var offsCmd = offsDpMaterial + (i * 8);
-            //    var w0 = this.mapdv.getUint32(offsCmd + 0x00);
-            //    var w1 = this.mapdv.getUint32(offsCmd + 0x04);
-//
-            //    s += w0.hex() + " " + w1.hex() + " ";
-            //    if(w0 == 0xDF000000) break;
-            //}
-            //console.log(s);
-            ///////////
+            var vertexColors = [
+                new THREE.Color(colors[face.colorIndex0]),
+                new THREE.Color(colors[face.colorIndex1]),
+                new THREE.Color(colors[face.colorIndex2])
+            ];
 
-            geom.faces.push(new THREE.Face3(face.vertexIndex0, face.vertexIndex1, face.vertexIndex2));
+            geom.faces.push(new THREE.Face3(face.vertexIndex0, face.vertexIndex1, face.vertexIndex2, faceNormal, vertexColors));
 
             if(face.vertexIndex3 != -1)
             {
-                geom.faces.push(new THREE.Face3(face.vertexIndex0, face.vertexIndex2, face.vertexIndex3));
+                var vertexColors = [
+                    new THREE.Color(colors[face.colorIndex0]),
+                    new THREE.Color(colors[face.colorIndex2]),
+                    new THREE.Color(colors[face.colorIndex3])
+                ];
+
+                geom.faces.push(new THREE.Face3(face.vertexIndex0, face.vertexIndex2, face.vertexIndex3, faceNormal, vertexColors));
             }
         }
 
-        var material = new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true });
-        var mesh = new THREE.Mesh(geom, material);
-        mesh.position.set(-position.x*32, position.z*32, position.y*32);
-        this.scene.add(mesh);
+        var fillMaterial = new THREE.MeshBasicMaterial({ vertexColors: THREE.VertexColors, side: THREE.DoubleSide, transparent: true, opacity: 0.9, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+        var wireMaterial = new THREE.MeshBasicMaterial({ color: 0x00FF00,  wireframe: true });
+        var fillMesh = new THREE.Mesh(geom, fillMaterial);
+        var wireMesh = new THREE.Mesh(geom, wireMaterial);
+
+        fillMesh.position.set(-position.x*32, position.z*32, position.y*32);
+        wireMesh.position.set(-position.x*32, position.z*32, position.y*32);
+
+        this.sceneAdd('sceneryObjects', [fillMesh, wireMesh]);
     }
+}
+
+Viewer.prototype.addMesh = function(file, offsDpTable)
+{
+    var geom = new THREE.Geometry();
+    
+    var meshMeta = new MeshMeta(file.dv, file.offsMeta);
+    var geomMeta = new GeometryMeta(file.dv, meshMeta.offsGeomMeta);
+
+    var colors = [];
+
+    var faceNormal = new THREE.Vector3(0, 0, 0);
+
+    for(var nColor = 0; nColor < geomMeta.numColors; nColor++)
+    {
+        var offsColor = geomMeta.offsColors + (nColor * 4);
+        var color = file.dv.getUint32(offsColor);
+        colors.push(color >>> 8);
+    }
+
+    for(var nVertex = 0; nVertex < geomMeta.numVertices; nVertex++)
+    {
+        var offsVertex = geomMeta.offsVertices + (nVertex * Vec3s.SIZE);
+        var vertex = new Vec3s(file.dv, offsVertex);
+        var vec3 = new THREE.Vector3(
+            (vertex.x + meshMeta.meshX) * -1.0,
+            (vertex.z + meshMeta.meshZ),
+            (vertex.y + meshMeta.meshY)
+        );
+        geom.vertices.push(vec3);
+    }
+
+    for(var nFace = 0; nFace < geomMeta.numFaces; nFace++)
+    {
+        var offsFace = geomMeta.offsFaces + (nFace * MeshFace.SIZE);
+        var face = new MeshFace(file.dv, offsFace);
+
+        var vertexColors = [
+            new THREE.Color(colors[face.colorIndex0]),
+            new THREE.Color(colors[face.colorIndex1]),
+            new THREE.Color(colors[face.colorIndex2])
+        ];
+
+        geom.faces.push(new THREE.Face3(face.vertexIndex0, face.vertexIndex1, face.vertexIndex2, faceNormal, vertexColors));
+
+        if(face.vertexIndex3 != -1)
+        {
+            var vertexColors = [
+                new THREE.Color(colors[face.colorIndex0]),
+                new THREE.Color(colors[face.colorIndex2]),
+                new THREE.Color(colors[face.colorIndex3])
+            ];
+
+            geom.faces.push(new THREE.Face3(face.vertexIndex0, face.vertexIndex2, face.vertexIndex3, faceNormal, vertexColors));
+        }
+    }
+
+    var fillMaterial = new THREE.MeshBasicMaterial({ vertexColors: THREE.VertexColors, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+    var wireMaterial = new THREE.MeshBasicMaterial({ color: 0xAAAAAA,  wireframe: true });
+    var fillMesh = new THREE.Mesh(geom, fillMaterial);
+    var wireMesh = new THREE.Mesh(geom, wireMaterial);
+
+    this.sceneAdd('trackMesh', [fillMesh]);
 }
 
 Viewer.prototype.sceneAddCoinGroups = function(offsCoinGroups, numCoinGroups)
@@ -552,9 +695,7 @@ Viewer.prototype.sceneAddCoinGroups = function(offsCoinGroups, numCoinGroups)
         var boundingPoints = new THREE.Points(boundingGeom, boundingPointsMaterial);
         var boundingBox = new THREE.BoxHelper(boundingPoints, 0xFFFF00);
 
-        this.scene.add(points);
-        this.scene.add(boundingPoints);
-        this.scene.add(boundingBox);
+        this.sceneAdd('coinGroups', [points, boundingPoints, boundingBox]);
     }
 }
 
@@ -582,8 +723,8 @@ Viewer.prototype.sceneAddBoosters = function(offsBoosters, numBoosters)
             geom.vertices.push(new THREE.Vector3(-posB.x*32, posB.z*32, posB.y*32))
             var line = new THREE.Line(geom, lineMaterial);
             var points = new THREE.Points(geom, pointsMaterial);
-            this.scene.add(line);
-            this.scene.add(points);
+
+            this.sceneAdd('boosters', [line, points]);
         }
     }
 }
@@ -599,7 +740,7 @@ Viewer.prototype.sceneAddUnk2 = function(fileGroup)
             var file = fileGroup.files[index];
             
             var geom = new THREE.Geometry();
-            var pointsMaterial = new THREE.PointsMaterial({ color: randColor24(100), size: 5, sizeAttenuation: false });
+            var pointsMaterial = new THREE.PointsMaterial({ color: 0xFF00FF, size: 5, sizeAttenuation: false });
 
             var unk0C = file.dv.getFloat32(0x0C);
             var unk10 = file.dv.getFloat32(0x10);
@@ -614,7 +755,8 @@ Viewer.prototype.sceneAddUnk2 = function(fileGroup)
             }
 
             var points = new THREE.Points(geom, pointsMaterial);
-            this.scene.add(points);
+            this.sceneAdd('otherPath', [points]);
+            //this.scene.add(points);
         }
     }
 }
@@ -658,8 +800,7 @@ Viewer.prototype.sceneAddUnkPath = function(fileGroup)
         
             var points = new THREE.Points(geom, pointsMaterial);
             var line = new THREE.Line(geom, lineMaterial);
-            this.scene.add(points);
-            this.scene.add(line);
+            this.sceneAdd('otherPath2', [points, line])
         }
     }
 }
@@ -684,8 +825,7 @@ Viewer.prototype.sceneAddTiltLines = function(offsTiltLines, numTiltLines)
         var points = new THREE.Points(geom, pointsMaterial);
         var line = new THREE.Line(geom, pointsMaterial);
 
-        this.scene.add(points);
-        this.scene.add(line);
+        this.sceneAdd('tiltLines', [points, line]);
     }
 }
 
@@ -722,10 +862,9 @@ Viewer.prototype.sceneAddUnknownSphere = function(offsUnk)
         }
     }
 
-    var material = new THREE.MeshBasicMaterial({ color: 0xFFFFFF, wireframe: true });
+    var material = new THREE.MeshBasicMaterial({ color: 0xFFFFFF, wireframe: true, transparent: true, opacity: 0.1 });
     var mesh = new THREE.Mesh(geom, material);
-
-    this.scene.add(mesh);
+    this.sceneAdd('skydome', [mesh]);
 }
 
 Viewer.prototype.sceneAddTrackModel = function(fileGroup, offsDpTable)
@@ -740,56 +879,6 @@ Viewer.prototype.sceneAddTrackModel = function(fileGroup, offsDpTable)
             this.addMesh(file, offsDpTable);
         }
     }
-}
-
-Viewer.prototype.addMesh = function(file, offsDpTable)
-{
-    var geom = new THREE.Geometry();
-    
-    var meshMeta = new MeshMeta(file.dv, file.offsMeta);
-    var geomMeta = new GeometryMeta(file.dv, meshMeta.offsGeomMeta);
-
-    for(var nVertex = 0; nVertex < geomMeta.numVertices; nVertex++)
-    {
-        var offsVertex = geomMeta.offsVertices + (nVertex * Vec3s.SIZE);
-        var vertex = new Vec3s(file.dv, offsVertex);
-        var vec3 = new THREE.Vector3(
-            (vertex.x + meshMeta.meshX) * -1.0,
-            (vertex.z + meshMeta.meshZ),
-            (vertex.y + meshMeta.meshY)
-        );
-        geom.vertices.push(vec3);
-    }
-
-    for(var nFace = 0; nFace < geomMeta.numFaces; nFace++)
-    {
-        var offsFace = geomMeta.offsFaces + (nFace * MeshFace.SIZE);
-        var face = new MeshFace(file.dv, offsFace);
-        geom.faces.push(new THREE.Face3(face.vertexIndex0, face.vertexIndex1, face.vertexIndex2));
-        if(face.vertexIndex3 != -1)
-        {
-            geom.faces.push(new THREE.Face3(face.vertexIndex0, face.vertexIndex2, face.vertexIndex3));
-        }
-
-        ///////////
-        //console.log(face.materialIndex.hex(2));
-        //var offsDpMaterial = this.mapdv.getUint32(offsDpTable + face.materialIndex * 4);
-        //var s = "";
-        //for(var i = 0;;i++)
-        //{
-        //    var offsCmd = offsDpMaterial + (i * 8);
-        //    var w0 = this.mapdv.getUint32(offsCmd + 0x00);
-        //    var w1 = this.mapdv.getUint32(offsCmd + 0x04);
-        //    s += w0.hex() + " " + w1.hex() + " ";
-        //    if(w0 == 0xDF000000) break;
-        //}
-        //console.log(s);
-        ///////////
-    }
-
-    var mat = new THREE.MeshBasicMaterial({ color: 0xFFFFFF, wireframe: true, transparent: true, opacity: 0.3 });
-    var obj = new THREE.Mesh(geom, mat);
-    this.scene.add(obj);
 }
 
 Viewer.prototype.sceneAddPath = function(fileGroup, color)
@@ -819,11 +908,10 @@ Viewer.prototype.sceneAddPath = function(fileGroup, color)
         }
     }
 
-    var pointField = new THREE.Points(geom, pointsMaterial);
+    var points = new THREE.Points(geom, pointsMaterial);
     var line = new THREE.Line(geom, lineMaterial);
 
-    this.scene.add(pointField);
-    this.scene.add(line);
+    this.sceneAdd('paths', [points, line]);
 }
 
 Viewer.prototype.loadRom = function(ab)
@@ -831,7 +919,33 @@ Viewer.prototype.loadRom = function(ab)
     this.ab = ab;
     this.dv = new DataView(ab);
     this.loadMap(0);
-    this.domSelect.removeAttribute('disabled');
+    this.dom['select'].removeAttribute('disabled');
+}
+
+var viewer = new Viewer('#container');
+viewer.animate();
+
+//////////////////////////////////////////////////
+
+Number.prototype.hex = function(len)
+{
+    len = len || 8;
+    var s = this.toString(16).toUpperCase();
+    while(s.length < len) s = "0" + s;
+    return s;
+}
+
+function debuglog(jsobj)
+{
+    var s = jsobj.constructor.name + " { ";
+    var keys = Object.keys(jsobj);
+    for(var i in keys)
+    {
+        if(i != 0) s += ", ";
+        s += keys[i] + ": " + jsobj[keys[i]].hex();
+    }
+    s += " }";
+    console.log(s);
 }
 
 function randColor24(minGamma)
@@ -842,8 +956,6 @@ function randColor24(minGamma)
     var b = (minGamma + Math.random() * t) & 0xFF;
     return (r << 16 | g << 8 | b);
 }
-
-//////////////////////////////////////////////////
 
 function attachFileReader(query, onloadend)
 {
@@ -894,10 +1006,6 @@ function saveAs(filename, data)
         document.body.removeChild(a);
     }
 }
-
-
-var viewer = new Viewer('#container');
-viewer.animate();
 
 </script>
 </body>
