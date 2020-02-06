@@ -344,10 +344,32 @@ WORD_RNC1 = 0x524E4301
 WORD_RNX2 = 0x524E5802
 WORD_RNC2 = 0x524E4302
 WORD_FILL = 0x46494C4C
+WORD_RAW  = 0x52415721
 WORD_END  = 0x454E4421
+
+allowed_first_words = ["RNX", "RNC", "FILL", "RAW!"]
+
+def __word_to_str(word):
+    string = ""
+    for i in range(3, -1, -1):
+        value = (word >> (i * 8)) & 0xFF
+        if (value >= 65 and value <= 90) or (value == 33):
+            string += str(chr(value))
+    return string
+
+def ALIGN4(word):
+    return (word + 3) & 0xFFFFFFFC
 
 def parseRNX(rom, i):
     offset = i*4
+    
+    firstWord = __word_to_str(__bytes_to_int(rom, offset))
+    if firstWord not in allowed_first_words:
+        return i + 1
+    firstWord = firstWord.lower()
+    if firstWord.endswith('!'):
+        firstWord = firstWord[:-1]
+        
     start_offset = offset
     output_data = [0] * 0
     while True:
@@ -369,20 +391,15 @@ def parseRNX(rom, i):
             fillValue = rom[offset + 6]
             output_data += [fillValue] * fillAmount
             offset += 8
+        elif word == WORD_RAW:
+            size = __bytes_to_int(rom, offset + 4)
+            output_data += rom[offset+8:offset+8+size]
+            offset += 8 + ALIGN4(size)
         else:
-            raise Exception("Invalid word!")
-    with open("out/" + hex(start_offset) + ".rnx.bin", "wb") as outFile:
+            raise Exception("Invalid word! " + hex(word))
+    with open("out/" + hex(start_offset) + "." + firstWord + ".bin", "wb") as outFile:
         outFile.write(bytearray(output_data))
     return offset // 4
-
-def parseStandaloneRNC(rom, i):
-    offset = i*4
-    cmp_size = __bytes_to_int(rom, offset + 8)
-    compressed_data = rom[offset:offset+cmp_size+0x12]
-    output_data = DecodeRNC(compressed_data)
-    with open("out/" + hex(offset) + ".rnc.bin", "wb") as outFile:
-        outFile.write(bytearray(output_data))
-    return (offset + cmp_size + 0x12) // 4
 
 if len(sys.argv) > 1:
     with open(sys.argv[1], "rb") as inFile:
@@ -396,13 +413,7 @@ if len(sys.argv) > 1:
         numWords = len(rom) // 4
         i = 0
         while i < numWords:
-            word = __bytes_to_int(rom, i*4)
-            if word == WORD_RNX1:
-                i = parseRNX(rom, i)
-            elif word == WORD_RNC1:
-                i = parseStandaloneRNC(rom, i)
-            else:
-                i += 1
+            i = parseRNX(rom, i)
         print("Done!")
 else:
     print("Usage: RNXExtract <ROM_FILE>")
