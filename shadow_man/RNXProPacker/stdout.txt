@@ -1,0 +1,9 @@
+DOSBox version 0.74-3
+Copyright 2002-2019 DOSBox Team, published under GNU GPL.
+---
+CONFIG:Loading primary settings from config file dosbox.conf
+
+Windows dpi/blurry apps scaling detected! The screen might be too large or not
+show properly, please see the DOSBox options file (fullresolution) for details.
+
+MIDI:Opened device:win32
