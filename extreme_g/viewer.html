@@ -1,0 +1,737 @@
+<html>
+<head>
+<meta charset="utf-8">
+<title>Extreme-G Level Viewer</title>
+<link href='https://fonts.googleapis.com/css?family=Open+Sans:400,400italic,700,700italic' rel='stylesheet' type='text/css'>
+<style>
+label
+{
+    user-select: none;
+}
+
+body, input, button, label, select
+{
+    font-family: "Open Sans";
+}
+
+select
+{
+    padding: 1px 6px;
+}
+</style>
+<script src="js/lzhuf.js"></script>
+<script src="js/three.min.js"></script>
+<script src="js/structs.js"></script>
+</head>
+<body style="background: #111; color: #FFF;">
+<div style="text-align: center;">
+    <div style="display: inline-block; margin: auto auto; text-align: left;">
+            <div style="padding-bottom: 10px; text-align: left;">ROM: <input type="file" id="file"></div>
+        <div id="container"></div>
+    </div>
+</div>
+
+<script>
+
+const NUM_EXG_LEVELS = 18;
+
+function Viewer(queryDomContainer)
+{
+    var _this = this;
+    this.scene = new THREE.Scene();
+    this.renderer = new THREE.WebGLRenderer({antialias: false});
+
+    this.objects = {
+        'main_mesh': { label: "Main mesh", visible: true, objects: [] }
+    }
+
+    this.initDOM(queryDomContainer);
+
+    this.dvRom = null;
+    this.dvGfx = null;
+    this.dvTransforms = null;
+
+    this.keysDown = {};
+
+    this.camSpeedZ = 0;
+    this.camSpeedX = 0;
+    this.camSpeedY = 0;
+
+    this.camRotSpeedX = 0;
+    this.camRotSpeedY = 0;
+
+    this.width = 1280;
+    this.height = 720;
+
+    this.renderer.setPixelRatio(window.devicePixelRatio);
+    this.renderer.setSize(this.width, this.height);
+    this.renderer.setScissorTest(true);
+    this.renderer.alpha = true;
+    this.renderer.setClearColor(0x555555, 1.0);
+    this.renderer.setViewport(0, 0, this.width, this.height);
+    this.renderer.setScissor(0, 0, this.width, this.height);
+
+    this.camera = new THREE.PerspectiveCamera(60, this.width/this.height, 1, 50000);
+    this.camera.rotation.order = "YXZ";
+
+    this.dom['render'].tabIndex = '0'
+    this.dom['render'].style.display = "inline-block";
+
+    this.dom['render'].onkeydown = function(e)
+    {
+        _this.keysDown[e.keyCode] = true;
+    	e.preventDefault();
+    	return false;
+    }
+
+    this.dom['render'].onkeyup = function(e)
+    {
+    	delete _this.keysDown[e.keyCode];
+    	e.preventDefault();
+    	return false;
+    }
+
+    this.dom['render'].oncontextmenu = function(e)
+    {
+        e.preventDefault();
+        return false;
+    }
+
+    this.dom['render'].onmousedown = function(e)
+    {
+        this.requestPointerLock();
+        this.focus();
+        e.preventDefault();
+        return false;
+    }
+
+    var lastMovementX = 0;
+    var lastMovementY = 0;
+
+    this.dom['render'].onmousemove = function(e)
+    {
+        if(e.buttons == 0)
+        {
+            return;
+        }
+
+        var movementX = (lastMovementX*2 + e.movementX) / 4;
+        var movementY = (lastMovementY*2 + e.movementY) / 4;
+        lastMovementX = movementX;
+        lastMovementY = movementY;
+
+        if(e.buttons == 1)
+        {
+            viewer.camera.translateX(-movementX * 5);
+            viewer.camera.translateY(movementY * 5);
+        }
+
+        if(e.buttons == 4)
+        {
+            viewer.camera.translateZ(-movementX * 5);
+            viewer.camera.translateZ(movementY * 5);
+        }
+
+        if(e.buttons == 2)
+        {
+            //viewer.camRotSpeedX = -e.movementX * 20;
+            viewer.camera.rotateY(-movementX * 0.01);
+            viewer.camera.rotateX(-movementY * 0.01);
+            viewer.camera.rotation.z = 0;
+        }
+    }
+
+    this.dom['render'].onmouseup = function(e)
+    {
+        lastMovementX = 0;
+        lastMovementY = 0;
+        document.exitPointerLock();
+    }
+
+    const CAM_MV_SPD = 30;
+
+    this.keyEvents = {
+	    //27: function(){ _this.resetCamera() }, // esc - reset camera position
+	    87: function(viewer){ viewer.camSpeedZ = -CAM_MV_SPD; }, // w - move forward
+	    65: function(viewer){ viewer.camSpeedX = -CAM_MV_SPD; }, // a - pan left
+	    83: function(viewer){ viewer.camSpeedZ = CAM_MV_SPD; }, // s - move backward
+	    68: function(viewer){ viewer.camSpeedX = CAM_MV_SPD; }, // d - pan right
+	    90: function(viewer){ viewer.camSpeedY = -CAM_MV_SPD; }, // z - move down
+	    88: function(viewer){ viewer.camSpeedY = CAM_MV_SPD; }, // x - move up
+	    40: function(viewer){ viewer.camRotSpeedX = -20; }, // down - rotate down
+	    38: function(viewer){ viewer.camRotSpeedX =  20; }, // up - rotate up
+	    37: function(viewer){ viewer.camRotSpeedY =  20;;}, // left - rotate left
+	    39: function(viewer){ viewer.camRotSpeedY = -20;}  // right - rotate right
+    }
+}
+
+Viewer.prototype.initDOM = function(queryDomContainer)
+{
+    var _this = this;
+
+    var dom = {
+        'select': document.createElement('select'),
+        'container': document.querySelector(queryDomContainer),
+        'toolbarPane': document.createElement('div'),
+        'mainPane': document.createElement('div'),
+        'togglePane': document.createElement('div'),
+        'render': this.renderer.domElement
+    };
+
+    dom['select'].setAttribute('disabled' , '');
+    dom['container'].appendChild(dom['select']);
+    dom['container'].appendChild(dom['toolbarPane']);
+    dom['container'].appendChild(dom['mainPane']);
+    dom['mainPane'].appendChild(dom['render']);
+    dom['mainPane'].appendChild(dom['togglePane']);
+
+    dom['container'].style = "background-color: #222; padding: 20px;";
+    dom['toolbarPane'].style = "padding-top: 10px; padding-bottom: 10px;";
+    dom['togglePane'].style = "padding-left: 10px; display: inline-block; vertical-align: top;";
+
+    for(var i = 0; i < NUM_EXG_LEVELS; i++)
+    {
+        var domOption = document.createElement('option');
+        domOption.innerHTML = "Level " + (i<0x10?"0":"") + i.toString(16).toUpperCase();
+        domOption.setAttribute('value', i);
+        dom['select'].appendChild(domOption);
+    }
+
+    dom['select'].addEventListener('change', function(e)
+    {
+        var mapIndex = (this.value | 0);
+        _this.loadMap(mapIndex);
+    })
+
+    this.dom = dom;
+}
+
+Viewer.prototype.animate = function()
+{
+    viewer.camera.translateZ(this.camSpeedZ);
+    viewer.camera.translateX(this.camSpeedX);
+    viewer.camera.translateY(this.camSpeedY);
+
+    viewer.camera.rotateX(this.camRotSpeedX / 1000);
+    viewer.camera.rotateY(this.camRotSpeedY / 1000);
+    viewer.camera.rotation.z = 0;
+
+    if(this.camSpeedZ < 0) this.camSpeedZ += 5;
+    if(this.camSpeedZ > 0) this.camSpeedZ -= 5;
+    if(this.camSpeedX > 0) this.camSpeedX -= 5;
+    if(this.camSpeedX < 0) this.camSpeedX += 5;
+    if(this.camSpeedY > 0) this.camSpeedY -= 5;
+    if(this.camSpeedY < 0) this.camSpeedY += 5;
+    if(this.camRotSpeedX > 0) this.camRotSpeedX -= 1;
+    if(this.camRotSpeedX < 0) this.camRotSpeedX += 1;
+    if(this.camRotSpeedY > 0) this.camRotSpeedY -= 1;
+    if(this.camRotSpeedY < 0) this.camRotSpeedY += 1;
+
+    for(var k in this.keysDown)
+    {
+        if(k in this.keyEvents) this.keyEvents[k](this);
+    }
+
+    this.renderer.render(this.scene, this.camera)
+    requestAnimationFrame(this.animate.bind(this));
+}
+
+Viewer.prototype.buildScene = function()
+{
+    var _this = this;
+
+    var dv = this.dvGfx;
+    var gfxOffset = 0;
+    var geometry = new THREE.Geometry();
+    var collisionGeometry = new THREE.Geometry();
+    var vertexBase = 0;
+    var vertexHeap = [];
+    var nDlist = 0;
+    var primcolor = 0;
+
+    var curTextureIndex = 0;
+    var fillMaterials = [];
+
+    var debugOutput = "";
+
+    // good enough
+    for(var i = 0; i < this.textures.length; i++)
+    {
+        fillMaterials.push(new THREE.MeshBasicMaterial({
+            vertexColors: THREE.VertexColors,
+            map: this.textures[i],
+            side: THREE.DoubleSide,
+            polygonOffset: true,
+            polygonOffsetFactor: 1,
+            polygonOffsetUnits: 1
+        }));
+    }
+
+    function readu8()
+    {
+        return dv.getUint8(gfxOffset++);
+    }
+
+    function readu16()
+    {
+        return (readu8() << 8) | readu8();
+    }
+
+    function reads16()
+    {
+        return ((readu16() << 16) >> 16);
+    }
+
+    function cmd_vertices()
+    {
+        var numVertices = readu8();
+
+        vertexBase = vertexHeap.length;
+
+        for(var j = 0; j < numVertices; j++)
+        {
+            var vertex = {
+                x: (reads16() / 3),
+                y: (reads16() / 3),
+                z: (reads16() / 3),
+                uv: _this.texCoords[readu8()],
+                color: readu8() << 16 | readu8() << 8 | readu8()
+            };
+
+            vertexHeap.push(vertex);
+        }
+    }
+
+    function cmd_tri1()
+    {
+        var d = (readu8() << 8) | readu8();
+        var v0 = (d >> 10) & 0x1F;
+        var v1 = (d >>  5) & 0x1F;
+        var v2 = (d >>  0) & 0x1F;
+
+        var normal = new THREE.Vector3(0,0,0);
+
+        var vertex0 = vertexHeap[vertexBase + v0];
+        var vertex1 = vertexHeap[vertexBase + v1];
+        var vertex2 = vertexHeap[vertexBase + v2];
+
+        var vertexColors = [
+            new THREE.Color(vertex0.color),
+            new THREE.Color(vertex1.color),
+            new THREE.Color(vertex2.color),
+        ];
+
+        var texwidth = 32;
+        var texheight = 32;
+
+        if(_this.textures[curTextureIndex])
+        {
+            texwidth = _this.textures[curTextureIndex].image.width;
+            texheight = _this.textures[curTextureIndex].image.height;
+        }
+
+        var _u0 = vertex0.uv[0] / texwidth;
+        var _v0 = vertex0.uv[1] / texheight;
+        var _u1 = vertex1.uv[0] / texwidth;
+        var _v1 = vertex1.uv[1] / texheight;
+        var _u2 = vertex2.uv[0] / texwidth;
+        var _v2 = vertex2.uv[1] / texheight;
+
+        var materialIndex = curTextureIndex;
+
+        var tx = (_this.dvTransforms.getInt32(nDlist * 0x28 + 0) / 3)
+        var ty = (_this.dvTransforms.getInt32(nDlist * 0x28 + 4) / 3);
+        var tz = (_this.dvTransforms.getInt32(nDlist * 0x28 + 8) / 3);
+
+        var numVertices = geometry.vertices.length;
+
+        // pushing redundant vertices because of the modifyvtx commands
+        geometry.vertices.push(new THREE.Vector3(vertex0.x + tx, vertex0.y + ty, vertex0.z + tz));
+        geometry.vertices.push(new THREE.Vector3(vertex1.x + tx, vertex1.y + ty, vertex1.z + tz));
+        geometry.vertices.push(new THREE.Vector3(vertex2.x + tx, vertex2.y + ty, vertex2.z + tz));
+
+        geometry.faceVertexUvs[0].push([
+            new THREE.Vector2(_u0, _v0),
+            new THREE.Vector2(_u1, _v1),
+            new THREE.Vector2(_u2, _v2)
+        ]);
+
+        geometry.faces.push(new THREE.Face3(
+            numVertices + 0,
+            numVertices + 1,
+            numVertices + 2,
+            normal,
+            vertexColors,
+            materialIndex));
+    }
+
+    function cmd_tri2()
+    {
+        cmd_tri1();
+        cmd_tri1();
+    }
+
+    function cmd_primcolor()
+    {
+        primcolor = (readu8() << 16) | (readu8() << 8) | readu8();
+    }
+
+    function cmd_collision_vertices()
+    {
+        var tx = (_this.dvTransforms.getInt32(nDlist * 0x28 + 0) / 3)
+        var ty = (_this.dvTransforms.getInt32(nDlist * 0x28 + 4) / 3);
+        var tz = (_this.dvTransforms.getInt32(nDlist * 0x28 + 8) / 3);
+
+        var numVertices = readu8();
+        for(var j = 0; j < numVertices; j++)
+        {
+            var x = reads16() / 3;
+            var y = reads16() / 3;
+            var z = reads16() / 3;
+
+            collisionGeometry.vertices.push(new THREE.Vector3(
+                x + tx,
+                y + ty,
+                z + tz
+            ));
+        }
+    }
+
+    function cmd_enddl()
+    {
+        nDlist++;
+    }
+
+    function cmd_nop()
+    {
+    }
+
+    function cmd_todo1()
+    {
+        readu8();
+    }
+
+    function cmd_todo2()
+    {
+        readu8();
+        readu8();
+    }
+
+    function cmd_update_vertex_texcoord()
+    {
+        vertexHeap[vertexBase + readu8()].uv = _this.texCoords[readu8()];
+    }
+
+    function cmd_level_texture()
+    {
+        curTextureIndex =  _this.texIndex_level + readu8();
+    }
+
+    function cmd_global_texture()
+    {
+        curTextureIndex = _this.texIndex_global + readu8();
+    }
+
+    function cmd_common_texture()
+    {
+        curTextureIndex = _this.texIndex_common + readu8();
+    }
+
+    var commands = {
+        0x00: cmd_enddl,
+        0x01: cmd_vertices,
+        0x02: cmd_level_texture,
+        0x03: cmd_primcolor,
+        0x04: cmd_tri1,
+        0x05: cmd_tri2,
+        0x08: cmd_collision_vertices,
+        0x09: cmd_update_vertex_texcoord,
+        0x0C: cmd_global_texture,
+        0x0D: cmd_common_texture,
+        0x06: cmd_nop,
+        0x07: cmd_nop,
+        0x0B: cmd_nop,
+        0x0A: cmd_nop,
+        0x0E: cmd_nop,
+        0x0F: cmd_nop
+    };
+
+    while(gfxOffset < this.dvGfx.byteLength)
+    {
+        var cmd = readu8();
+        if(cmd in commands)
+        {
+            commands[cmd]();
+        }
+        else
+        {
+            console.log("unhandled command " + cmd.toString(16));
+            return;
+        }
+    }
+
+    var wireMaterial = new THREE.MeshBasicMaterial({ color: 0xFFFFFF, wireframe: true, opacity: 0.1, transparent: true });
+    var wireMesh = new THREE.Mesh(geometry, wireMaterial);
+    var fillMesh = new THREE.Mesh(geometry, fillMaterials);
+    
+    var collisionMaterial = new THREE.PointsMaterial({ color: 0xFF0000, size: 30 });
+    var collisionMesh = new THREE.Points(collisionGeometry, collisionMaterial);
+
+    this.sceneAdd('main_mesh', [ wireMesh, fillMesh, collisionMesh ]);
+}
+
+Viewer.prototype.sceneAdd = function(tag, objectArray)
+{
+    var visible = this.objects[tag].visible;
+    for(var i in objectArray)
+    {
+        objectArray[i].visible = visible;
+        this.scene.add(objectArray[i]);
+    }
+    this.objects[tag].objects.push(objectArray);
+}
+
+function dvalloc(numBytes)
+{
+    return new DataView(new ArrayBuffer(numBytes));
+}
+
+function dvpart(dv, offset, size)
+{
+    return new DataView(dv.buffer, offset);
+}
+
+Viewer.prototype.loadMap = function(mapNum)
+{
+    while(this.scene.children.length > 0)
+    {
+        this.scene.remove(this.scene.children[0]); 
+    }
+
+    const RA_LEVEL_TABLE = 0x00001408;
+    const RA_COMMON_TEXBANK_TABLE = 0x00001450;
+    const RA_GLOBAL_TEXBANK = 0x000C3400;
+
+    var raLevelInfo = this.dvRom.getUint32(RA_LEVEL_TABLE + mapNum * 4);
+    var raCommonTextureBank = this.dvRom.getUint32(RA_COMMON_TEXBANK_TABLE + mapNum * 4)
+    
+    var levelInfo = new LevelInfo(this.dvRom, raLevelInfo);
+    var raTransformations = raLevelInfo + levelInfo.offsTransformations;
+    var raTextureMeta = raLevelInfo + levelInfo.offsTextureMeta;
+    var raTextureFile = raLevelInfo + levelInfo.offsTextureFile;
+    var raGfxFile = raLevelInfo + levelInfo.offsGfxFile;
+    var raTexCoordFile = raLevelInfo + levelInfo.offsTexCoordFile;
+
+    this.dvTransforms = dvpart(this.dvRom, raTransformations, levelInfo.numTransformations * 0x28);
+
+    var dvGlobalTextureBank = this.lzhufLoad(RA_GLOBAL_TEXBANK);
+    var dvCommonTextureBank = this.lzhufLoad(raCommonTextureBank);
+    var dvLevelTexMeta = this.lzhufLoad(raTextureMeta, true, levelInfo.numTextures * 0x0C);
+    var dvLevelTextures = this.lzhufLoad(raTextureFile, true, levelInfo.textureFileSize);
+    var dvTexCoords = this.lzhufLoad(raTexCoordFile, true, levelInfo.texCoordFileSize);
+    this.dvGfx = this.lzhufLoad(raGfxFile, true, levelInfo.gfxFileSize);
+
+    this.texCoords = [];
+    this.textures = [];
+    this.texIndex_level = 0;
+    this.texIndex_global = 0;
+    this.texIndex_common = 0;
+
+    for(var i = 0; i < dvTexCoords.byteLength; i += 4)
+    {
+        var u = dvTexCoords.getInt16(i + 0) / 64;
+        var v = dvTexCoords.getInt16(i + 2) / 64;
+        this.texCoords.push([u, v]);
+    }
+
+    this.texIndex_level = this.textures.length;
+    this.initLevelTextures(dvLevelTexMeta, dvLevelTextures, levelInfo.numTextures);
+
+    this.texIndex_global = this.textures.length;
+    this.initBankTextures(dvGlobalTextureBank);
+
+    this.texIndex_common = this.textures.length;
+    this.initBankTextures(dvCommonTextureBank);
+
+    this.buildScene();
+}
+
+Viewer.prototype.lzhufLoad = function(romAddress, bHeaderless, dstSize)
+{
+    if(!bHeaderless)
+    {
+        dstSize = this.dvRom.getUint32(romAddress);
+        romAddress += 4;
+    }
+
+    if(!dstSize)
+    {
+        throw new Error("dstSize 0 or undefined");
+    }
+
+    var dvDst = dvalloc(dstSize);
+    lzhuf.decode(dvpart(this.dvRom, romAddress), dvDst, dstSize);
+    return dvDst;
+}
+
+Viewer.prototype.initLevelTextures = function(dvLevelTexMeta, dvLevelTextures, numTextures)
+{
+    for(var i = 0; i < numTextures; i++)
+    {
+        var entry = dvpart(dvLevelTexMeta, i * 0x0C);
+        var width = entry.getUint8(0x00);
+        var height = entry.getUint8(0x01);
+        var format = entry.getUint8(0x02);
+        var ciOffset = entry.getUint32(0x04);
+        var tlutOffset = entry.getUint32(0x08);
+
+        var dataTexture = null;
+
+        if(format == 1)
+        {
+            dataTexture = create_datatexture_from_ci8(dvLevelTextures, ciOffset, tlutOffset, width, height);
+        }
+        else if(format == 2)
+        {
+            dataTexture = create_datatexture_from_ci4(dvLevelTextures, ciOffset, tlutOffset, width, height);
+        }
+
+        this.textures.push(dataTexture);
+    }
+}
+
+// for common and global texture files
+Viewer.prototype.initBankTextures = function(dvTextureBank)
+{
+    var tlutOffset = dvTextureBank.getUint32(0x00);
+    var numTextures = (dvTextureBank.getUint32(0x08) - 8) / 8; // hack, use offset of the first texture to determine length
+    for(var i = 0; i < numTextures; i++)
+    {
+        var entry = dvpart(dvTextureBank, 0x08 + i*8);
+        var ciOffset = entry.getUint32(0x00);
+        var width = entry.getUint16(0x04);
+        var height = entry.getUint16(0x06);
+
+        var dataTexture = create_datatexture_from_ci8(dvTextureBank, ciOffset, tlutOffset, width, height);
+        this.textures.push(dataTexture);
+    }
+}
+
+function create_datatexture_from_ci8(dv, ciOffset, tlutOffset, width, height)
+{
+    var numTexels = width * height;
+    var data = new Uint8Array(numTexels * 4);
+
+    for(var i = 0; i < numTexels; i++)
+    {
+        var ci = dv.getUint8(ciOffset + i);
+        var texel = dv.getUint16(tlutOffset + ci*2);
+        const factor = 0xFF / 0x1F;
+        data[i*4+0] = (((texel >> 11) & 0x1F) * factor) | 0;
+        data[i*4+1] = (((texel >>  6) & 0x1F) * factor) | 0;
+        data[i*4+2] = (((texel >>  1) & 0x1F) * factor) | 0;
+        data[i*4+3] = (texel & 1) * 255;
+    }
+
+    var dataTexture = new THREE.DataTexture(data, width, height, THREE.RGBAFormat);
+    dataTexture.magFilter = THREE.LinearFilter;
+    dataTexture.wrapS = THREE.RepeatWrapping;
+    dataTexture.wrapT = THREE.RepeatWrapping;
+
+    return dataTexture;
+}
+
+function create_datatexture_from_ci4(dv, ciOffset, tlutOffset, width, height)
+{
+    var numTexels = width * height;
+    var data = new Uint8Array(numTexels * 4);
+
+    for(var i = 0; i < numTexels/2; i++)
+    {
+        var byte = dv.getUint8(ciOffset + i);
+        var ci0 = (byte & 0xF0) >> 4;
+        var ci1 = (byte & 0x0F);
+        var texel0 = dv.getUint16(tlutOffset + ci0*2);
+        var texel1 = dv.getUint16(tlutOffset + ci1*2);
+        const factor = 0xFF / 0x1F;
+        data[i*8+0] = (((texel0 >> 11) & 0x1F) * factor) | 0;
+        data[i*8+1] = (((texel0 >>  6) & 0x1F) * factor) | 0;
+        data[i*8+2] = (((texel0 >>  1) & 0x1F) * factor) | 0;
+        data[i*8+3] = (texel0 & 1) * 255;
+        data[i*8+4] = (((texel1 >> 11) & 0x1F) * factor) | 0;
+        data[i*8+5] = (((texel1 >>  6) & 0x1F) * factor) | 0;
+        data[i*8+6] = (((texel1 >>  1) & 0x1F) * factor) | 0;
+        data[i*8+7] = (texel1 & 1) * 255;
+    }
+
+    var dataTexture = new THREE.DataTexture(data, width, height, THREE.RGBAFormat);
+    dataTexture.magFilter = THREE.LinearFilter;
+    dataTexture.wrapS = THREE.RepeatWrapping;
+    dataTexture.wrapT = THREE.RepeatWrapping;
+
+    return dataTexture;
+}
+
+Viewer.prototype.loadRom = function(abRom)
+{
+    this.abRom = abRom;
+    this.dvRom = new DataView(abRom);
+
+    this.loadMap(0);
+    this.dom['select'].removeAttribute('disabled');
+}
+
+var viewer = new Viewer('#container');
+viewer.animate();
+
+//////////////////////////////////////////////////
+
+Number.prototype.hex = function(len)
+{
+    len = len || 8;
+    var s = this.toString(16).toUpperCase();
+    while(s.length < len) s = "0" + s;
+    return s;
+}
+
+function attachFileReader(query, onloadend)
+{
+    var domFileInput = document.querySelector(query);
+    var reader = new FileReader();
+    reader.onloadend = function()
+    {
+        onloadend(reader.result);
+    }
+
+    domFileInput.addEventListener('change', function()
+    {
+        reader.readAsArrayBuffer(domFileInput.files[0]);
+    });
+}
+
+attachFileReader('#file', function(ab)
+{
+    viewer.loadRom(ab);
+})
+
+document.body.ondragenter = function(e){e.preventDefault();}
+document.body.ondragover = function(e){e.preventDefault();}
+
+document.body.ondrop = function(e)
+{
+    e.preventDefault();
+
+    if(e.dataTransfer.files)
+    {
+        var file = e.dataTransfer.files[0];
+        var reader = new FileReader();
+        reader.onloadend = function()
+        {
+            viewer.loadRom(reader.result);
+        }
+        reader.readAsArrayBuffer(file);
+    }
+}
+</script>
+</body>
+</html>
