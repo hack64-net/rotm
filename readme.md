@@ -24,12 +24,12 @@ Nintendo 64 hacking tool repository for hack64.net's ROM of the Month campaign.
 - bigf_extractor - "bigf" archive extractor ([Python source](https://github.com/hack64-net/rotm/tree/master/supercross_2000/bigf_extractor))
 - fntn_viewer - Web-based font sheet viewer ([Preview](https://htmlpreview.github.io/?https://github.com/hack64-net/rotm/blob/master/supercross_2000/fntn_viewer/FNTN_Viewer.html)) ([JS/HTML source](https://github.com/hack64-net/rotm/tree/master/supercross_2000/fntn_viewer))
 - rnd_viewer - Web-based model viewer for extracted "rnd" files ([Preview](https://htmlpreview.github.io/?https://github.com/hack64-net/rotm/blob/master/supercross_2000/rnd_viewer/RND_Viewer.html)) ([JS/HTML source](https://github.com/hack64-net/rotm/tree/master/supercross_2000/rnd_viewer))
-- shpn_viewer - ([Preview](https://htmlpreview.github.io/?https://github.com/hack64-net/rotm/blob/master/supercross_2000/shpn_viewer/SHPN_Viewer.html)) ([JS/HTML source](https://github.com/hack64-net/rotm/tree/master/supercross_2000/shpn_viewer))
+- shpn_viewer - Web-based "shpn" texture file viewer ([Preview](https://htmlpreview.github.io/?https://github.com/hack64-net/rotm/blob/master/supercross_2000/shpn_viewer/SHPN_Viewer.html)) ([JS/HTML source](https://github.com/hack64-net/rotm/tree/master/supercross_2000/shpn_viewer))
 
 ### August 2019: Gex 3: Deep Cover Gecko
 
  - [Gex 3: Deep Cover Gecko Hacking Wiki](https://hack64.net/wiki/doku.php?id=gex_3_deep_cover_gecko)
- - gex3viewer - A web based level viewer ([Preview](https://htmlpreview.github.io/?https://github.com/hack64-net/rotm/blob/master/gex_3/gex3viewer/Gex3_Viewer.html)) ([JS/HTML source](https://github.com/hack64-net/rotm/tree/master/gex_3/gex3viewer))
+ - gex3viewer - Web-based level viewer ([Preview](https://htmlpreview.github.io/?https://github.com/hack64-net/rotm/blob/master/gex_3/gex3viewer/Gex3_Viewer.html)) ([JS/HTML source](https://github.com/hack64-net/rotm/tree/master/gex_3/gex3viewer))
  - GexCompress - Compressor/decompressor for Gex 3 data ([Python source](https://github.com/hack64-net/rotm/tree/master/gex_3/GexCompress))
 
 ![gex3viewer](https://camo.githubusercontent.com/50248efd126680af5243b21f48f9da720486b134/68747470733a2f2f692e696d6775722e636f6d2f507276537043622e706e67)
@@ -37,7 +37,7 @@ Nintendo 64 hacking tool repository for hack64.net's ROM of the Month campaign.
 ### September 2019: Forsaken 64
 
 - [Forsaken 64 Hacking Wiki](https://hack64.net/wiki/doku.php?id=forsaken_64)
-- Forsaken64Viewer - Model viewer & exporter ([Preview](https://htmlpreview.github.io/?https://github.com/hack64-net/rotm/blob/master/forsaken_64/Forsaken64Viewer/Forsaken64_Viewer.html)) ([JS/HTML source](https://github.com/hack64-net/rotm/tree/master/forsaken_64/Forsaken64Viewer))
+- Forsaken64Viewer - Web-based model viewer & exporter ([Preview](https://htmlpreview.github.io/?https://github.com/hack64-net/rotm/blob/master/forsaken_64/Forsaken64Viewer/Forsaken64_Viewer.html)) ([JS/HTML source](https://github.com/hack64-net/rotm/tree/master/forsaken_64/Forsaken64Viewer))
 - RNXExtract - ROM decompressor ([Python source](https://github.com/hack64-net/rotm/tree/master/forsaken_64/RNXExtract))
 
 ![Forsaken64Viewer](https://camo.githubusercontent.com/bdb078f594f2dafd47e3d323130022ce8c68f014/68747470733a2f2f692e696d6775722e636f6d2f366567666d4b362e706e67)
@@ -50,7 +50,7 @@ Nintendo 64 hacking tool repository for hack64.net's ROM of the Month campaign.
 
 - bhdecode - ROM decompressor ([C source](https://github.com/hack64-net/rotm/tree/master/bomberman_hero/decompressor))
 
-### December 2020: Toy Story 2: Buzz Lightyear to the Rescue!
+### December 2019: Toy Story 2: Buzz Lightyear to the Rescue!
 
 - Nothing of note. This ROM is complicated. We'll probably visit this one again some time in the future.
 
