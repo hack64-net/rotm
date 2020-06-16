@@ -52,7 +52,7 @@ Nintendo 64 hacking tool repository for hack64.net's ROM of the Month campaign.
 
 ### December 2020: Toy Story 2: Buzz Lightyear to the Rescue!
 
-- Nothing of note. This ROM is complicated. We'll probably revisit this one again some time in the future.
+- Nothing of note. This ROM is complicated. We'll probably visit this one again some time in the future.
 
 ### January 2020: Stunt Racer 64
 
